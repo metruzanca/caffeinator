@@ -1,0 +1,25 @@
+[env]
+DISCORD_SERVER_ID = "1033770808360841317"
+
+[tools]
+"github:metruzanca/disc" = "latest"
+terraform = "latest"
+
+[hooks]
+postinstall = [
+  "railway whoami || railway login --browserless",
+  "cd checkpoint-bot && railway link --workspace \"metruzanca's Projects\" --project \"Checkpoint Bot\" --service checkpoint-bot",
+  "cd server-config && railway link --workspace \"metruzanca's Projects\" --project \"Checkpoint Bot\" --service server-config",
+]
+
+[tasks.tf-plan]
+description = "Run terraform plan"
+run = "cd server-config && railway run terraform plan"
+
+[tasks.tf-apply]
+description = "Run terraform apply with auto-approve"
+run = "cd server-config && railway run terraform apply -auto-approve"
+
+[tasks.tf-fmt]
+description = "Format terraform files"
+run = "cd server-config && railway run terraform fmt"
