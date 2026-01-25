@@ -80,12 +80,6 @@ resource "discord_category_channel" "admin" {
   position  = 4
 }
 
-resource "discord_category_channel" "archived" {
-  server_id = discord_server.main.id
-  name      = "Archived"
-  position  = 5
-}
-
 # =============================================================================
 # Text Channels (No Category)
 # =============================================================================
@@ -312,27 +306,6 @@ resource "discord_text_channel" "moderator_only" {
   category                 = discord_category_channel.admin.id
   position                 = 20
   sync_perms_with_category = false
-}
-
-# =============================================================================
-# Archived Category Channels
-# =============================================================================
-
-resource "discord_text_channel" "til" {
-  server_id                = discord_server.main.id
-  name                     = "til"
-  category                 = discord_category_channel.archived.id
-  position                 = 21
-  sync_perms_with_category = true
-  topic                    = "**T**oday **I** **L**earned | The place to share what you've been learning _and possibly spark discussion_."
-}
-
-resource "discord_text_channel" "gear_kbs" {
-  server_id                = discord_server.main.id
-  name                     = "gear-kbs"
-  category                 = discord_category_channel.archived.id
-  position                 = 22
-  sync_perms_with_category = true
 }
 
 # =============================================================================
