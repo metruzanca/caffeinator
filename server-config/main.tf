@@ -1,4 +1,22 @@
 terraform {
+  backend "s3" {
+    bucket = "terraform-state-3abuno2jq"
+    key    = "server-config/terraform.tfstate"
+    region = "auto"
+
+    # S3-compatible endpoint settings
+    endpoints = {
+      s3 = "https://storage.railway.app"
+    }
+
+    # Required for S3-compatible storage
+    skip_credentials_validation = true
+    skip_metadata_api_check     = true
+    skip_region_validation      = true
+    skip_requesting_account_id  = true
+    use_path_style              = true
+  }
+
   required_providers {
     discord = {
       source  = "Lucky3028/discord"
