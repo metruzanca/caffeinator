@@ -31,9 +31,8 @@ provider "discord" {
 
 # Variables
 variable "server_id" {
-  description = "Discord server ID"
+  description = "Discord server ID (set via TF_VAR_server_id)"
   type        = string
-  default     = "1033770808360841317"
 }
 
 # Discord Server
