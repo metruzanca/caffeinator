@@ -60,7 +60,7 @@ Context behavior:
 - A reply uses the replied-to message plus up to 9 messages before it.
 - If the replied-to message is gone or inaccessible, it falls back to the last 10 messages before the mention.
 - Bot messages are sent as `assistant` turns. Everything else is a `user` turn with the author name prefixed.
-- A system prompt gives the bot its stack and makes it reply like a peer: casual, direct, and competent. It avoids unsolicited advice, checklists, and step-by-step remediation. It also avoids em dashes, keeps sentences simple, and limits replies to a single tweet (280 characters or fewer) unless the user asks for more. Override it with `CHAT_SYSTEM_PROMPT`.
+- A system prompt gives the bot its stack and persistent memory, and makes it reply like a peer: casual, direct, and competent. It avoids unsolicited advice, checklists, and step-by-step remediation. It also avoids em dashes, keeps sentences simple, and limits replies to a single tweet (280 characters or fewer) unless the user asks for more. Override it with `CHAT_SYSTEM_PROMPT`.
 
 Web search:
 

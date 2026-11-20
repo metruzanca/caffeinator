@@ -46,6 +46,11 @@ type WebSearchParameters struct {
 	MaxUses    int `json:"max_uses,omitempty"`
 }
 
+// ResponseFormat requests a specific response shape.
+type ResponseFormat struct {
+	Type string `json:"type"`
+}
+
 // Client calls OpenRouter's chat completions endpoint.
 type Client struct {
 	APIKey              string
@@ -53,6 +58,7 @@ type Client struct {
 	BaseURL             string
 	MaxTokens           int
 	SystemPrompt        string
+	ResponseFormat      *ResponseFormat
 	WebSearch           bool
 	WebSearchMaxResults int
 	WebSearchMaxUses    int
@@ -61,10 +67,11 @@ type Client struct {
 }
 
 type chatRequest struct {
-	Model     string    `json:"model"`
-	Messages  []Message `json:"messages"`
-	MaxTokens int       `json:"max_tokens,omitempty"`
-	Tools     []Tool    `json:"tools,omitempty"`
+	Model          string          `json:"model"`
+	Messages       []Message       `json:"messages"`
+	MaxTokens      int             `json:"max_tokens,omitempty"`
+	ResponseFormat *ResponseFormat `json:"response_format,omitempty"`
+	Tools          []Tool          `json:"tools,omitempty"`
 }
 
 type chatResponse struct {
@@ -107,9 +114,10 @@ func (c *Client) ChatWithSystem(ctx context.Context, systemPrompt string, messag
 	}
 
 	request := chatRequest{
-		Model:     c.Model,
-		Messages:  messages,
-		MaxTokens: c.MaxTokens,
+		Model:          c.Model,
+		Messages:       messages,
+		MaxTokens:      c.MaxTokens,
+		ResponseFormat: c.ResponseFormat,
 	}
 	if c.WebSearch {
 		request.Tools = []Tool{{

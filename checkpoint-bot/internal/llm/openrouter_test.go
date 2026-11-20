@@ -123,6 +123,32 @@ func TestChatWithSystemOverridesPrompt(t *testing.T) {
 	require.Equal(t, "override prompt", got.Messages[0].Content)
 }
 
+func TestChatAddsResponseFormat(t *testing.T) {
+	var got chatRequest
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Errorf("cannot decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"{\"facts\":[]}"}}]}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		APIKey:         "test-key",
+		Model:          "deepseek/deepseek-v4.1-flash-1017",
+		BaseURL:        server.URL,
+		ResponseFormat: &ResponseFormat{Type: "json_object"},
+		RetryDelay:     time.Millisecond,
+	}
+
+	_, _, err := client.Chat(context.Background(), []Message{{Role: "user", Content: "extract facts"}})
+	require.NoError(t, err)
+	require.NotNil(t, got.ResponseFormat)
+	require.Equal(t, "json_object", got.ResponseFormat.Type)
+}
+
 func TestChatAddsWebSearchTool(t *testing.T) {
 	var got chatRequest
 

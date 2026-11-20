@@ -173,6 +173,7 @@ Context rules:
 - Bot messages become `assistant` turns.
 - Other messages become `user` turns prefixed with the author's display name.
 - A system prompt tells the bot its stack: Go, discordgo, Railway, OpenRouter, and DeepSeek V4.1 Flash 1017.
+- It also tells the bot it has persistent markdown memory and must not claim it cannot remember between sessions.
 - It makes replies peer-like: casual, direct, and free of unsolicited remediation.
 - It bans em dashes and asks for short, simple sentences.
 - It also limits replies to a single tweet (280 characters) unless the user asks for more detail.
@@ -210,6 +211,7 @@ Write path:
 - Filter by `MEMORY_MIN_CONFIDENCE`.
 - Deduplicate against existing markdown.
 - Write atomically with a temporary file and rename.
+- Use JSON response format and enough output tokens to avoid truncated JSON.
 
 Rules:
 
