@@ -34,5 +34,6 @@ func PersistentPreRunE(cmd *cobra.Command, args []string) error {
 	if err := LoadConfig(); err != nil {
 		return fmt.Errorf("failed to load config: %w", err)
 	}
+	ConfigureLogging()
 	return nil
 }
