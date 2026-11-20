@@ -50,6 +50,8 @@ Two features exist:
 
 Use `github.com/charmbracelet/log`.
 
+`config.ConfigureLogging` sends the default logger to stdout. Locally it uses the text formatter. On Railway, where `RAILWAY_ENVIRONMENT` is set, it switches to the JSON formatter so Railway can read the `level` field instead of treating all stderr output as an error. Do not write logs directly to stderr.
+
 Pattern:
 
 ```go
@@ -173,6 +175,9 @@ Location: `internal/llm/openrouter.go`
 
 - OpenAI-compatible `POST /chat/completions` at OpenRouter.
 - No system message is added by the client.
+- Web search uses the `openrouter:web_search` server tool, not the deprecated `:online` suffix or `web` plugin.
+- The server tool is only added when `OPENROUTER_WEB_SEARCH` is true. The model decides whether a search is needed.
+- Search limits live in `OPENROUTER_WEB_SEARCH_MAX_RESULTS` and `OPENROUTER_WEB_SEARCH_MAX_USES`.
 - Retry once on network errors, `429`, and `5xx`.
 - Never log the API key.
 - Return clear errors that include status and a short response body.
@@ -189,6 +194,7 @@ Configuration uses Viper and dotenv.
 - `OPENROUTER_API_KEY` is environment-only and should never be added as a flag.
 - `.env` is gitignored. Keep `.env.example` current.
 - If the OpenRouter key is empty, mention chat is disabled and `/link` still works.
+- Web search is enabled by default with `OPENROUTER_WEB_SEARCH=true`. It is capped by `OPENROUTER_WEB_SEARCH_MAX_RESULTS` and `OPENROUTER_WEB_SEARCH_MAX_USES` to control cost.
 
 ---
 

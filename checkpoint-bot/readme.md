@@ -17,7 +17,7 @@
 Caffeinator is a lightweight, stateless Discord bot with two jobs:
 
 - **Fix social links** so Discord renders proper embeds.
-- **Chat when mentioned** using an LLM through OpenRouter.
+- **Chat when mentioned** using an LLM through OpenRouter, with optional live web search.
 
 Checkpoint and goal tracking were removed. If that feature comes back, it will start from a fresh design.
 
@@ -57,6 +57,13 @@ Context behavior:
 - If the replied-to message is gone or inaccessible, it falls back to the last 10 messages before the mention.
 - Bot messages are sent as `assistant` turns. Everything else is a `user` turn with the author name prefixed.
 - No system prompt is sent.
+
+Web search:
+
+- The model can search the web when it decides it needs current information.
+- Searches are capped at 2 per request and 3 results per search by default.
+- Citations come back as normal markdown links.
+- Web search uses OpenRouter credits, roughly $0.007 per search with the default Exa engine, plus model token costs. Casual mentions that do not need current information should not search at all.
 
 Other behavior:
 
@@ -100,9 +107,13 @@ Copy `.env.example` to `.env` and fill it in, or set the same variables in your 
 | `CLIENT_ID` | empty | Discord application client ID, used by `checkpoint invite` |
 | `CHANNEL_ID` | empty | Optional channel for startup notifications |
 | `STARTUP_MESSAGE` | `true` | Print startup info and send the restart notice |
+| `LOG_FORMAT` | `text` | `text` or `json`. Automatically `json` when `RAILWAY_ENVIRONMENT` is set |
 | `OPENROUTER_API_KEY` | empty | Enables mention chat when set |
 | `OPENROUTER_MODEL` | `deepseek/deepseek-v4.1-flash-1017` | OpenRouter model slug |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Override for testing |
+| `OPENROUTER_WEB_SEARCH` | `true` | Let the model search the web when needed |
+| `OPENROUTER_WEB_SEARCH_MAX_RESULTS` | `3` | Maximum results per search |
+| `OPENROUTER_WEB_SEARCH_MAX_USES` | `2` | Maximum searches per chat request |
 | `CHAT_ENABLED` | `true` | Set to `false` to disable mention chat |
 | `CHAT_CONTEXT_MESSAGES` | `10` | Messages to include, including the reply anchor |
 | `CHAT_MAX_TOKENS` | `2048` | Maximum output tokens |
@@ -181,6 +192,8 @@ go vet ./...
 The suite covers link rewriting, context assembly, mention detection, response chunking, rate limiting, and the OpenRouter client (with `httptest`, no live API calls).
 
 ### Logging
+
+Logs go to stdout. Locally they use charmbracelet's text format. On Railway they switch to JSON automatically so Railway can read the `level` field and color info, warn, and error correctly.
 
 Use `github.com/charmbracelet/log` with key-value pairs:
 

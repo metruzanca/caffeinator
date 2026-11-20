@@ -195,6 +195,7 @@ func (c *Chat) respond(m *discordgo.MessageCreate, referenced *discordgo.Message
 		"duration", time.Since(started),
 		"prompt_tokens", usage.PromptTokens,
 		"completion_tokens", usage.CompletionTokens,
+		"web_search_requests", usage.ServerToolUseDetails.WebSearchRequests,
 	)
 
 	c.send(m, content)

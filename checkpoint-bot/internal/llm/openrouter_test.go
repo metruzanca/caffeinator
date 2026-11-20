@@ -68,6 +68,66 @@ func TestChatSendsMessagesWithoutSystemPrompt(t *testing.T) {
 	}
 }
 
+func TestChatAddsWebSearchTool(t *testing.T) {
+	var got chatRequest
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Errorf("cannot decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"choices":[{"message":{"content":"grounded answer"}}],
+			"usage":{"server_tool_use_details":{"web_search_requests":2}}
+		}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		APIKey:              "test-key",
+		Model:               "deepseek/deepseek-v4.1-flash-1017",
+		BaseURL:             server.URL,
+		WebSearch:           true,
+		WebSearchMaxResults: 3,
+		WebSearchMaxUses:    2,
+		RetryDelay:          time.Millisecond,
+	}
+
+	_, usage, err := client.Chat(context.Background(), []Message{{Role: "user", Content: "latest news?"}})
+	require.NoError(t, err)
+	require.Equal(t, 2, usage.ServerToolUseDetails.WebSearchRequests)
+	require.Len(t, got.Tools, 1)
+	require.Equal(t, "openrouter:web_search", got.Tools[0].Type)
+	require.NotNil(t, got.Tools[0].Parameters)
+	require.Equal(t, 3, got.Tools[0].Parameters.MaxResults)
+	require.Equal(t, 2, got.Tools[0].Parameters.MaxUses)
+}
+
+func TestChatOmitsWebSearchToolWhenDisabled(t *testing.T) {
+	var got chatRequest
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Errorf("cannot decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"plain answer"}}]}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		APIKey:     "test-key",
+		Model:      "deepseek/deepseek-v4.1-flash-1017",
+		BaseURL:    server.URL,
+		WebSearch:  false,
+		RetryDelay: time.Millisecond,
+	}
+
+	_, _, err := client.Chat(context.Background(), []Message{{Role: "user", Content: "hello"}})
+	require.NoError(t, err)
+	require.Empty(t, got.Tools)
+}
+
 func TestChatReturnsAPIErrorWithoutRetry(t *testing.T) {
 	var calls atomic.Int32
 

@@ -114,11 +114,23 @@ func newChatFromConfig(session *discordgo.Session) *Chat {
 		baseURL = "https://openrouter.ai/api/v1"
 	}
 
+	webSearchMaxResults := viper.GetInt("OPENROUTER_WEB_SEARCH_MAX_RESULTS")
+	if webSearchMaxResults < 1 {
+		webSearchMaxResults = 3
+	}
+	webSearchMaxUses := viper.GetInt("OPENROUTER_WEB_SEARCH_MAX_USES")
+	if webSearchMaxUses < 1 {
+		webSearchMaxUses = 2
+	}
+
 	client := &llm.Client{
-		APIKey:    apiKey,
-		Model:     model,
-		BaseURL:   baseURL,
-		MaxTokens: viper.GetInt("CHAT_MAX_TOKENS"),
+		APIKey:              apiKey,
+		Model:               model,
+		BaseURL:             baseURL,
+		MaxTokens:           viper.GetInt("CHAT_MAX_TOKENS"),
+		WebSearch:           viper.GetBool("OPENROUTER_WEB_SEARCH"),
+		WebSearchMaxResults: webSearchMaxResults,
+		WebSearchMaxUses:    webSearchMaxUses,
 	}
 
 	cfg := ChatConfig{
@@ -132,7 +144,12 @@ func newChatFromConfig(session *discordgo.Session) *Chat {
 		MaxConcurrent:      viper.GetInt("CHAT_MAX_CONCURRENT"),
 	}
 
-	log.Info("chat enabled", "model", model)
+	log.Info("chat enabled",
+		"model", model,
+		"web_search", client.WebSearch,
+		"web_search_max_results", client.WebSearchMaxResults,
+		"web_search_max_uses", client.WebSearchMaxUses,
+	)
 	return newChat(session, client, cfg)
 }
 

@@ -26,25 +26,44 @@ type Message struct {
 
 // Usage reports token usage for a request.
 type Usage struct {
-	PromptTokens     int `json:"prompt_tokens"`
-	CompletionTokens int `json:"completion_tokens"`
-	TotalTokens      int `json:"total_tokens"`
+	PromptTokens         int `json:"prompt_tokens"`
+	CompletionTokens     int `json:"completion_tokens"`
+	TotalTokens          int `json:"total_tokens"`
+	ServerToolUseDetails struct {
+		WebSearchRequests int `json:"web_search_requests"`
+	} `json:"server_tool_use_details"`
+}
+
+// Tool is an OpenRouter server tool entry.
+type Tool struct {
+	Type       string               `json:"type"`
+	Parameters *WebSearchParameters `json:"parameters,omitempty"`
+}
+
+// WebSearchParameters configures the OpenRouter web search server tool.
+type WebSearchParameters struct {
+	MaxResults int `json:"max_results,omitempty"`
+	MaxUses    int `json:"max_uses,omitempty"`
 }
 
 // Client calls OpenRouter's chat completions endpoint.
 type Client struct {
-	APIKey     string
-	Model      string
-	BaseURL    string
-	MaxTokens  int
-	RetryDelay time.Duration
-	HTTPClient *http.Client
+	APIKey              string
+	Model               string
+	BaseURL             string
+	MaxTokens           int
+	WebSearch           bool
+	WebSearchMaxResults int
+	WebSearchMaxUses    int
+	RetryDelay          time.Duration
+	HTTPClient          *http.Client
 }
 
 type chatRequest struct {
 	Model     string    `json:"model"`
 	Messages  []Message `json:"messages"`
 	MaxTokens int       `json:"max_tokens,omitempty"`
+	Tools     []Tool    `json:"tools,omitempty"`
 }
 
 type chatResponse struct {
@@ -75,11 +94,22 @@ func (c *Client) Chat(ctx context.Context, messages []Message) (string, Usage, e
 		return "", Usage{}, errors.New("no messages to send")
 	}
 
-	body, err := json.Marshal(chatRequest{
+	request := chatRequest{
 		Model:     c.Model,
 		Messages:  messages,
 		MaxTokens: c.MaxTokens,
-	})
+	}
+	if c.WebSearch {
+		request.Tools = []Tool{{
+			Type: "openrouter:web_search",
+			Parameters: &WebSearchParameters{
+				MaxResults: c.WebSearchMaxResults,
+				MaxUses:    c.WebSearchMaxUses,
+			},
+		}}
+	}
+
+	body, err := json.Marshal(request)
 	if err != nil {
 		return "", Usage{}, fmt.Errorf("cannot encode request: %w", err)
 	}
