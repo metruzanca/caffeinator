@@ -157,7 +157,8 @@ Context rules:
 - Include messages in chronological order.
 - Bot messages become `assistant` turns.
 - Other messages become `user` turns prefixed with the author's display name.
-- A system prompt makes replies peer-like: casual, direct, and free of unsolicited remediation.
+- A system prompt tells the bot its stack: Go, discordgo, Railway, OpenRouter, and DeepSeek V4.1 Flash 1017.
+- It makes replies peer-like: casual, direct, and free of unsolicited remediation.
 - It bans em dashes and asks for short, simple sentences.
 - It also limits replies to a single tweet (280 characters) unless the user asks for more detail.
 - The system prompt can be overridden with `CHAT_SYSTEM_PROMPT`.
@@ -177,7 +178,7 @@ Response rules:
 Location: `internal/llm/openrouter.go`
 
 - OpenAI-compatible `POST /chat/completions` at OpenRouter.
-- A system prompt is prepended when configured. The bot uses a default peer-tone prompt with simple sentences, no em dashes, and a 280-character single-tweet limit.
+- A system prompt is prepended when configured. The bot uses a default peer-tone prompt that states its stack, keeps sentences simple, bans em dashes, and limits replies to 280 characters.
 - Web search uses the `openrouter:web_search` server tool, not the deprecated `:online` suffix or `web` plugin.
 - The server tool is only added when `OPENROUTER_WEB_SEARCH` is true. The model decides whether a search is needed.
 - Search limits live in `OPENROUTER_WEB_SEARCH_MAX_RESULTS` and `OPENROUTER_WEB_SEARCH_MAX_USES`.
