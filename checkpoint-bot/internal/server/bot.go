@@ -2,32 +2,38 @@ package server
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
+	"github.com/bwmarrin/discordgo"
 	"github.com/charmbracelet/log"
-	"github.com/metruzanca/checkpoint-bot/internal/database"
-	"github.com/metruzanca/checkpoint-bot/internal/database/sqlite"
+	"github.com/metruzanca/checkpoint-bot/internal/llm"
 	"github.com/metruzanca/checkpoint-bot/internal/server/commands"
 	"github.com/metruzanca/checkpoint-bot/internal/util"
 	"github.com/spf13/viper"
-
-	"github.com/bwmarrin/discordgo"
 )
 
+// Bot owns the Discord session, slash commands, and mention chat.
 type Bot struct {
 	DiscordClient  *discordgo.Session
-	Database       database.CheckpointDatabase
 	CommandHandler *commands.CommandHandler
+	chat           *Chat
 }
 
-func NewBot(token string, dbPath string) *Bot {
+// NewBot creates a Discord session with the intents required for slash
+// commands and reading message context.
+func NewBot(token string) *Bot {
 	session, err := discordgo.New("Bot " + token)
 	if err != nil {
-		log.Fatal("Error creating Discord session: ", "err", err)
+		log.Fatal("cannot create Discord session", "err", err)
 	}
+
+	session.Identify.Intents = discordgo.IntentsGuilds |
+		discordgo.IntentsGuildMessages |
+		discordgo.IntentMessageContent
+
 	return &Bot{
 		DiscordClient: session,
-		Database:      sqlite.NewSqliteDatabase(dbPath),
 	}
 }
 
@@ -37,90 +43,135 @@ func init() {
 	startTime = time.Now()
 }
 
+// Start connects to Discord and registers handlers.
 func (b *Bot) Start() error {
-	// Startup logging
 	b.DiscordClient.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
-		log.Info("Logged in as", "username", s.State.User.Username+"#"+s.State.User.Discriminator, "bot_id", s.State.User.ID)
+		log.Info("logged in", "username", s.State.User.Username, "bot_id", s.State.User.ID)
 
 		if !viper.GetBool("STARTUP_MESSAGE") {
-			// Gets annoying in development
 			return
 		}
 
 		fmt.Println("Invite me to a server: ", util.GetInviteLink(s.State.User.ID))
-		// Show connected guilds
-		guilds := b.DiscordClient.State.Guilds
-		for _, guild := range guilds {
+
+		for _, guild := range b.DiscordClient.State.Guilds {
 			if guild.Name == "" {
-				// I think `State.Guilds` is a cache, sometimes it's empty. Weird
-				b.DiscordClient.Guild(guild.ID)
+				// The guild cache is sometimes incomplete right after login.
+				if _, err := b.DiscordClient.Guild(guild.ID); err != nil {
+					log.Warn("cannot fetch guild details", "guild", guild.ID, "err", err)
+				}
 			}
 
-			log.Info("Guild", "id", guild.ID, "name", guild.Name, "member_count", guild.MemberCount)
+			log.Info("guild", "id", guild.ID, "name", guild.Name, "member_count", guild.MemberCount)
 		}
 
-		// Show available commands
-		registeredCommands := commands.GetAvailableCommands()
-		for _, cmd := range registeredCommands {
-			log.Info("Command", "name", cmd.Name, "description", cmd.Description)
+		for _, cmd := range commands.GetAvailableCommands() {
+			log.Info("command", "name", cmd.Name, "description", cmd.Description)
 		}
 
-		// Send a message to the dev channel if it is set
 		channelID := viper.GetString("CHANNEL_ID")
 		if channelID != "" {
 			b.SendTextMessage(channelID, "Bot has restarted.")
 		}
 	})
 
-	err := b.DiscordClient.Open()
-	if err != nil {
-		return fmt.Errorf("Error opening Discord session: %w", err)
+	if chat := newChatFromConfig(b.DiscordClient); chat != nil {
+		b.chat = chat
+		b.DiscordClient.AddHandler(chat.Handle)
 	}
 
-	b.CommandHandler = commands.NewCommandHandler(b.DiscordClient, b.Database)
+	if err := b.DiscordClient.Open(); err != nil {
+		return fmt.Errorf("cannot open Discord session: %w", err)
+	}
+
+	b.CommandHandler = commands.NewCommandHandler(b.DiscordClient)
 	b.CommandHandler.RegisterCommands()
 
-	// Handle bot being added to a new server
 	b.DiscordClient.AddHandler(b.onGuildJoined)
 
 	return nil
 }
 
+func newChatFromConfig(session *discordgo.Session) *Chat {
+	if !viper.GetBool("CHAT_ENABLED") {
+		log.Info("chat disabled")
+		return nil
+	}
+
+	apiKey := strings.TrimSpace(viper.GetString("OPENROUTER_API_KEY"))
+	if apiKey == "" {
+		log.Warn("chat disabled: OPENROUTER_API_KEY is not set")
+		return nil
+	}
+
+	model := strings.TrimSpace(viper.GetString("OPENROUTER_MODEL"))
+	if model == "" {
+		model = "deepseek/deepseek-v4.1-flash-1017"
+	}
+
+	baseURL := strings.TrimSpace(viper.GetString("OPENROUTER_BASE_URL"))
+	if baseURL == "" {
+		baseURL = "https://openrouter.ai/api/v1"
+	}
+
+	client := &llm.Client{
+		APIKey:    apiKey,
+		Model:     model,
+		BaseURL:   baseURL,
+		MaxTokens: viper.GetInt("CHAT_MAX_TOKENS"),
+	}
+
+	cfg := ChatConfig{
+		ContextMessages:    viper.GetInt("CHAT_CONTEXT_MESSAGES"),
+		MaxContextChars:    viper.GetInt("CHAT_MAX_CONTEXT_CHARS"),
+		MaxCharsPerMessage: viper.GetInt("CHAT_MAX_CHARS_PER_MESSAGE"),
+		MaxChunks:          viper.GetInt("CHAT_MAX_CHUNKS"),
+		Timeout:            time.Duration(viper.GetInt("CHAT_TIMEOUT_SECONDS")) * time.Second,
+		RateLimitCapacity:  viper.GetInt("CHAT_RATE_LIMIT_CAPACITY"),
+		RateLimitWindow:    time.Duration(viper.GetInt("CHAT_RATE_LIMIT_SECONDS")) * time.Second,
+		MaxConcurrent:      viper.GetInt("CHAT_MAX_CONCURRENT"),
+	}
+
+	log.Info("chat enabled", "model", model)
+	return newChat(session, client, cfg)
+}
+
 func (b *Bot) onGuildJoined(s *discordgo.Session, g *discordgo.GuildCreate) {
-	log.Info("Bot added to new guild", "guild_id", g.ID, "guild_name", g.Name, "member_count", g.MemberCount)
+	log.Info("bot added to guild", "guild_id", g.ID, "guild_name", g.Name, "member_count", g.MemberCount)
 	b.CommandHandler.RegisterCommandsForGuild(g.ID)
 }
 
+// UnregisterCommands removes every slash command from every guild.
 func (b *Bot) UnregisterCommands() {
 	for _, guild := range b.DiscordClient.State.Guilds {
 		registeredCommands, err := b.DiscordClient.ApplicationCommands(b.DiscordClient.State.User.ID, guild.ID)
 		if err != nil {
-			log.Error("Failed to get registered commands", "guild", guild.ID, "err", err)
+			log.Error("failed to get registered commands", "guild", guild.ID, "err", err)
 			continue
 		}
 		for _, cmd := range registeredCommands {
-			err := b.DiscordClient.ApplicationCommandDelete(b.DiscordClient.State.User.ID, guild.ID, cmd.ID)
-			if err != nil {
-				log.Error("Failed to delete command", "command", cmd.Name, "guild", guild.ID, "err", err)
+			if err := b.DiscordClient.ApplicationCommandDelete(b.DiscordClient.State.User.ID, guild.ID, cmd.ID); err != nil {
+				log.Error("failed to delete command", "command", cmd.Name, "guild", guild.ID, "err", err)
 			}
 		}
 	}
 
-	log.Info("Commands unregistered successfully.")
+	log.Info("commands unregistered")
 }
 
+// Stop closes the Discord session.
 func (b *Bot) Stop() {
-	b.DiscordClient.Close()
-	b.Database.Close()
-
-	log.Info("Bot stopped gracefully.", "runtime", time.Since(startTime))
+	if err := b.DiscordClient.Close(); err != nil {
+		log.Error("cannot close Discord session", "err", err)
+	}
+	log.Info("bot stopped gracefully", "runtime", time.Since(startTime))
 }
 
+// SendTextMessage sends a plain text message to a channel.
 func (b *Bot) SendTextMessage(channelID, message string) {
-	_, err := b.DiscordClient.ChannelMessageSend(channelID, message)
-	if err != nil {
-		log.Error("Error sending message: ", "err", err)
+	if _, err := b.DiscordClient.ChannelMessageSend(channelID, message); err != nil {
+		log.Error("cannot send message", "err", err, "channel", channelID)
+		return
 	}
-
-	log.Info("Message sent to channel: ", "channelID", channelID, "message", message)
+	log.Info("message sent", "channel", channelID)
 }

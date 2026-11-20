@@ -14,41 +14,65 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:               "checkpoint",
-	Short:             "A Discord bot for managing our accountability group's checkpoints",
+	Short:             "Caffeinator, a Discord bot for The Coffee Break",
 	PersistentPreRunE: config.PersistentPreRunE,
 	Run: func(cmd *cobra.Command, args []string) {
 		token := viper.GetString("TOKEN")
-		dbPath := viper.GetString("DB_PATH")
-
-		log.Info("Starting bot")
-
-		bot := server.NewBot(token, dbPath)
-
-		if err := bot.Start(); err != nil {
-			log.Fatal("Error starting bot", "err", err)
+		if token == "" {
+			log.Fatal("TOKEN is required")
 		}
 
-		// Wait for interrupt signal to gracefully shutdown
-		// Docker containers typically send SIGTERM when stopping
+		log.Info("starting bot")
+
+		bot := server.NewBot(token)
+
+		if err := bot.Start(); err != nil {
+			log.Fatal("cannot start bot", "err", err)
+		}
+
+		// Docker sends SIGTERM when stopping a container.
 		sc := make(chan os.Signal, 1)
 		signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 		<-sc
-		log.Info("Shutting down...")
+		log.Info("shutting down")
 		bot.Stop()
 	},
 }
 
 func Execute() {
-	err := rootCmd.Execute()
-	if err != nil {
+	if err := rootCmd.Execute(); err != nil {
 		os.Exit(1)
 	}
 }
 
 func init() {
-	viper.SetDefault("DB_PATH", "./db/checkpoint.db")
 	viper.SetDefault("STARTUP_MESSAGE", true)
+	viper.SetDefault("OPENROUTER_MODEL", "deepseek/deepseek-v4.1-flash-1017")
+	viper.SetDefault("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+	viper.SetDefault("CHAT_ENABLED", true)
+	viper.SetDefault("CHAT_CONTEXT_MESSAGES", 10)
+	viper.SetDefault("CHAT_MAX_TOKENS", 1024)
+	viper.SetDefault("CHAT_MAX_CONTEXT_CHARS", 20000)
+	viper.SetDefault("CHAT_MAX_CHARS_PER_MESSAGE", 4000)
+	viper.SetDefault("CHAT_MAX_CHUNKS", 3)
+	viper.SetDefault("CHAT_TIMEOUT_SECONDS", 60)
+	viper.SetDefault("CHAT_MAX_CONCURRENT", 4)
+	viper.SetDefault("CHAT_RATE_LIMIT_CAPACITY", 1)
+	viper.SetDefault("CHAT_RATE_LIMIT_SECONDS", 5)
+
 	rootCmd.PersistentFlags().String("TOKEN", "", "Discord bot token (required)")
-	rootCmd.PersistentFlags().String("CHANNEL_ID", "", "Discord channel ID")
-	rootCmd.PersistentFlags().String("DB_PATH", "./db/checkpoint.db", "Path to SQLite database file")
+	rootCmd.PersistentFlags().String("CLIENT_ID", "", "Discord application client ID")
+	rootCmd.PersistentFlags().String("CHANNEL_ID", "", "Discord channel ID for startup notifications")
+	rootCmd.PersistentFlags().Bool("STARTUP_MESSAGE", true, "Send startup notifications")
+	rootCmd.PersistentFlags().String("OPENROUTER_MODEL", "deepseek/deepseek-v4.1-flash-1017", "OpenRouter model slug")
+	rootCmd.PersistentFlags().Bool("CHAT_ENABLED", true, "Enable mention chat")
+	rootCmd.PersistentFlags().Int("CHAT_CONTEXT_MESSAGES", 10, "Number of channel messages to include as context")
+	rootCmd.PersistentFlags().Int("CHAT_MAX_TOKENS", 1024, "Maximum tokens for a model response")
+	rootCmd.PersistentFlags().Int("CHAT_MAX_CONTEXT_CHARS", 20000, "Maximum characters of context to send")
+	rootCmd.PersistentFlags().Int("CHAT_MAX_CHARS_PER_MESSAGE", 4000, "Maximum characters per context message")
+	rootCmd.PersistentFlags().Int("CHAT_MAX_CHUNKS", 3, "Maximum Discord messages per response")
+	rootCmd.PersistentFlags().Int("CHAT_TIMEOUT_SECONDS", 60, "OpenRouter request timeout in seconds")
+	rootCmd.PersistentFlags().Int("CHAT_MAX_CONCURRENT", 4, "Maximum concurrent chat requests")
+	rootCmd.PersistentFlags().Int("CHAT_RATE_LIMIT_CAPACITY", 1, "Chat requests allowed per user per rate limit window")
+	rootCmd.PersistentFlags().Int("CHAT_RATE_LIMIT_SECONDS", 5, "Chat rate limit window in seconds")
 }

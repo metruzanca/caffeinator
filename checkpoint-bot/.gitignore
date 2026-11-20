@@ -1,6 +1,10 @@
 # Error logs
 tmp
-# Database
-db
 # Binary
 checkpoint-bot
+# Legacy checkpoint database
+db
+# Local environment
+.env
+.env.*
+!.env.example

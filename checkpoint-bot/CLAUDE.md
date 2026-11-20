@@ -2,377 +2,212 @@
 
 ## Quick Summary for AI Agents
 
-**Critical Rules**:
+**Critical rules**
 
-- **MUST**: Use `github.com/charmbracelet/log` for logging (NOT standard Go log)
-- **MUST**: Use structured logging with key-value pairs: `log.Info("message", "key", value)`
-- **MUST**: Edit only `queries.sql` for database queries (DO NOT edit generated files)
-- **MUST**: Use `dbContext()` helper for all database operations in command handlers
-- **MUST**: Always respond to Discord interactions using `s.InteractionRespond()`
-- **MUST**: Each command file have `init()` function calling `registerCommand()`
-- **MUST**: Convert sqlc return values to pointers in database implementations
+- **MUST**: Use `github.com/charmbracelet/log` for logging, not the standard library `log`.
+- **MUST**: Use structured logging with key-value pairs: `log.Info("message", "key", value)`.
+- **MUST**: Respond to every Discord interaction exactly once.
+- **MUST**: Register slash commands from an `init()` function with `registerCommand()`.
+- **MUST**: Use "server" instead of "guild" in user-facing text.
+- **MUST**: Never log message contents or API keys.
+- **MUST NOT**: Add a database layer without an explicit product decision. The bot is stateless right now.
 
-**Key File Locations**:
+**Key files**
 
 - Commands: `internal/server/commands/*.go`
-- Database queries: `internal/database/queries/queries.sql` (EDIT THIS)
-- Database interface: `internal/database/checkpoint_db.go`
-- Database implementation: `internal/database/sqlite/sqlite_db.go`
-- Migrations: `internal/database/migrations/NNNNN_name.sql`
-- Context helper: `dbContext()` in `internal/server/commands/commands.go`
+- Command registration: `internal/server/commands/commands.go`
+- Bot lifecycle: `internal/server/bot.go`
+- Mention chat: `internal/server/chat.go`
+- OpenRouter client: `internal/llm/openrouter.go`
+- Rate limiter: `internal/ratelimit/ratelimit.go`
+- Configuration: `internal/config/config.go` and `cmd/root.go`
+- CLI: `cmd/*.go`
 
-**Build Commands**:
+**Build and test**
 
-- **MUST**: Use `go build ./...` to verify the project builds correctly
-- **MUST**: Use `go generate ./...` to regenerate sqlc code after editing `queries.sql`
-
----
-
-## Core Principles
-
-- **12 Factor App**: This project follows 12 Factor app principles
-- **Logging**: Use structured logging extensively for debugging. Use `github.com/charmbracelet/log` (NOT standard Go log)
-- **Business Logic Separation**: Business logic lives in two distinct layers:
-  - Data layer: `internal/database/queries/` and `internal/database/migrations/`
-  - User interactions: `internal/server/commands/`
+```bash
+go build ./...
+go vet ./...
+go test ./...
+```
 
 ---
 
-## Logging Rules
+## Architecture
 
-### REQUIRED: Use Structured Logging
+The bot is a stateless Discord client. There is no database, ORM, migration tool, or `go generate` step.
 
-**MUST**: Use `github.com/charmbracelet/log` package for all logging operations.
+Two features exist:
 
-**MUST NOT**: Use standard Go `log` package.
+1. `/link` rewrites social media URLs for embed-friendly hosts.
+2. Mention chat sends recent channel context to OpenRouter and posts the response.
 
-**MUST**: Prefix all log values with string names using key-value pairs.
+`cmd/root.go` starts the bot and handles shutdown. `internal/server.NewBot` creates the Discord session and sets the required intents. `Bot.Start` connects, registers the chat handler, installs slash commands, and handles newly joined servers.
 
-**MUST**: Include context in error logs with relevant identifiers.
+---
 
-**MUST**: Use appropriate log levels: `log.Debug()`, `log.Info()`, `log.Error()`, `log.Fatal()`
+## Logging
 
-**MUST NOT**: Log without context or key-value pairs.
+Use `github.com/charmbracelet/log`.
 
-### Logging Pattern
-
-**Format**: `log.Level("message", "key1", value1, "key2", value2)`
-
-**Required Context Keys**:
-
-- Error logs: MUST include `"err"` key with error value
-- Command logs: SHOULD include `"command"` and `"user"` or `"channel"` keys
-- Database logs: SHOULD include relevant identifiers like `"channel"`, `"checkpoint_id"`, etc.
-
-### Example:
+Pattern:
 
 ```go
-log.Info("Command executed", "command", cmdName, "user", userID)
-log.Error("cannot create checkpoint", "err", err, "channel", i.ChannelID)
+log.Info("command executed", "command", name, "user", userID, "channel", channelID)
+log.Error("cannot send response", "err", err, "channel", channelID)
 ```
+
+Rules:
+
+- Error logs MUST include an `"err"` key.
+- Command logs SHOULD include `"command"`, `"user"`, and `"channel"`.
+- Chat logs SHOULD include `"guild"`, `"channel"`, and `"user"`, plus latency and token usage.
+- NEVER log message text, prompts, or API keys.
+- Use `Debug` for noise, `Info` for normal operation, `Warn` for recoverable problems, `Error` for failures, and `Fatal` only during startup.
 
 ---
 
-## Database Layer (`internal/database/`)
+## Slash Commands
 
-### SQL Queries (`internal/database/queries/`)
+Location: `internal/server/commands/`
 
-**Tool**: Uses **sqlc** for type-safe SQL queries
-
-**File Location**: `internal/database/queries/queries.sql`
-
-**MUST**: Edit only `internal/database/queries/queries.sql` - sqlc generates all Go code from this file.
-
-**MUST NOT**: Edit generated files: `queries.sql.go`, `models.go`, `db.go`
-
-**MUST**: After editing `queries.sql`, run `go generate ./...` to regenerate sqlc code.
-
-**MUST**: Use `go build ./...` to verify the project builds correctly after making changes.
-
-### Query Annotations
-
-**Pattern**: `-- name: QueryName :annotation`
-
-**Annotations**:
-
-- `:one` - Returns a single row (use for SELECT, INSERT with RETURNING)
-- `:exec` - Executes without returning rows (use for UPDATE, DELETE, INSERT without RETURNING)
-
-**Rules**:
-
-- **MUST**: ALL Create operations use `:one` annotation and return the created record
-- **MUST**: Update/Delete operations use `:exec` annotation (no return value)
-- Models are auto-generated from SQL schema by sqlc
-- The `Queries` struct wraps database operations and supports transactions via `WithTx()`
-
-**Example Query**:
-
-```sql
--- name: CreateCheckpoint :one
-INSERT INTO checkpoints (scheduled_at, channel_id)
-VALUES (?, ?) RETURNING *;
-
--- name: CompleteGoal :exec
-UPDATE goals
-SET status = 'completed'
-WHERE discord_user = ? AND checkpoint_id = ?;
-```
-
-### Database Interface Pattern
-
-**Interface Location**: `internal/database/checkpoint_db.go`
-
-**Implementation Location**: `internal/database/sqlite/sqlite_db.go`
-
-**Pattern**:
-
-- `CheckpointDatabase` interface defines all database operations
-- Implementations (e.g., `SQLiteCheckpointDatabase`) wrap sqlc-generated queries
-- **CRITICAL**: Interface methods return pointers (`*queries.Checkpoint`) while sqlc returns values
-- **MUST**: Database implementations convert sqlc return values to pointers for interface consistency
-
-**Example Implementation Pattern**:
-
-```go
-func (d *SqliteDatabase) CreateCheckpoint(ctx context.Context, params queries.CreateCheckpointParams) (*queries.Checkpoint, error) {
-    result, err := d.queries.CreateCheckpoint(ctx, params)
-    if err != nil {
-        return nil, err
-    }
-    return &result, nil  // Convert value to pointer
-}
-```
-
-### Migrations (`internal/database/migrations/`)
-
-**Tool**: Uses **goose** for database migrations
-
-**File Pattern**: `NNNNN_name.sql` (e.g., `00001_initial.sql`)
-
-**Location**: `internal/database/migrations/`
-
-**MUST**: Each migration file include both sections:
-
-- `-- +goose Up` section for forward migration
-- `-- +goose Down` section for rollback
-
-**Implementation Details**:
-
-- Migrations are embedded using `//go:embed *.sql`
-- Custom logger (`errorOnlyLogger`) only logs errors, suppresses normal messages
-- SQLite3 dialect is configured
-- Migrations run automatically on database initialization
-
-**Example Migration**:
-
-```sql
--- +goose Up
-CREATE TABLE checkpoints (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    scheduled_at TEXT NOT NULL,
-    channel_id TEXT NOT NULL,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-);
-
--- +goose Down
-DROP TABLE checkpoints;
-```
-
----
-
-## Commands (`internal/server/commands/`)
-
-### Command Registration Pattern
-
-**Location**: Each command file in `internal/server/commands/*.go`
-
-**MUST**: Each command file have an `init()` function that calls `registerCommand()`
-
-**Global Storage**: All commands are stored in a global `commands` map (defined in `commands.go`)
-
-**Command Structure**:
+Command type:
 
 ```go
 type Command struct {
-    discordgo.ApplicationCommand  // Discord command definition
-    Handler func(db database.CheckpointDatabase, s *discordgo.Session, i *discordgo.InteractionCreate)
+    discordgo.ApplicationCommand
+    Handler func(s *discordgo.Session, i *discordgo.InteractionCreate)
 }
 ```
 
-**Registration Pattern**:
+Registration:
 
 ```go
-var MyCommand = &Command{
+var ExampleCmd = &Command{
     ApplicationCommand: discordgo.ApplicationCommand{
-        Name:        "command-name",
-        Description: "Command description",
-        Options: []*discordgo.ApplicationCommandOption{...},
+        Name:        "example",
+        Description: "Example command",
     },
-    Handler: func(db database.CheckpointDatabase, s *discordgo.Session, i *discordgo.InteractionCreate) {
-        // Handler implementation
+    Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+        // Respond exactly once.
     },
 }
 
 func init() {
-    registerCommand(MyCommand)
+    registerCommand(ExampleCmd)
 }
 ```
 
-**Lifecycle**:
+Lifecycle:
 
-- Commands are registered per guild on bot startup
-- Unregistered commands are automatically cleaned up via `clearUnregisteredCommands()`
-- Commands are registered via `CommandHandler.RegisterCommands()` in `Bot.Start()` (see `internal/server/bot.go`)
+- Commands are registered per guild.
+- `clearUnregisteredCommands` deletes commands that exist in Discord but not in the current build.
+- Commands are rate limited per user by `commandRateLimiter`.
 
-### Command Handler Pattern
+Handler rules:
 
-**Handler Signature**:
-
-```go
-func(db database.CheckpointDatabase, s *discordgo.Session, i *discordgo.InteractionCreate)
-```
-
-**Required Patterns**:
-
-1. **Context Usage**:
-
-   - **MUST**: Use `dbContext()` helper function for all database operations
-   - **MUST**: Always defer `cancel()` after calling `dbContext()`
-   - **Pattern**: 
-     ```go
-     ctx, cancel := dbContext()
-     defer cancel()
-     ```
-   - Example: `db.CreateCheckpoint(ctx, params)`
-
-2. **Error Handling**:
-
-   - **MUST**: Log errors with context before responding
-   - **MUST**: Respond to errors directly using `s.InteractionRespond()` with appropriate error messages
-   - **Pattern**: 
-     ```go
-     if err != nil {
-         log.Error("action description", "err", err, "context_key", contextValue)
-         s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-             Type: discordgo.InteractionResponseChannelMessageWithSource,
-             Data: &discordgo.InteractionResponseData{
-                 Content: "User-friendly error message",
-             },
-         })
-         return
-     }
-     ```
-
-3. **Interaction Response**:
-   - **MUST**: Use `s.InteractionRespond()` to respond to interactions
-   - **MUST**: Always respond to interactions (never leave them hanging)
-   - **MUST**: Use user-friendly error messages (use "server" not "guild" in messages)
-
-4. **User-Facing Terminology**:
-   - **MUST**: Use "server" instead of "guild" in all user-facing messages (error messages, responses, etc.)
-   - **MUST NOT**: Use "guild" in any text that Discord users will see
-   - **Note**: "Guild" is Discord's internal API term, but users refer to them as "servers"
-   - **OK**: Use "guild" in code, variable names, log messages, and internal documentation
-   - **Example**: Error message should say "Error getting server information" not "Error getting guild information"
-
-**Example Handler**:
-
-```go
-Handler: func(db database.CheckpointDatabase, s *discordgo.Session, i *discordgo.InteractionCreate) {
-    ctx, cancel := dbContext()
-    defer cancel()
-
-    result, err := db.SomeOperation(ctx, params)
-    if err != nil {
-        log.Error("cannot perform operation", "err", err, "channel", i.ChannelID)
-        s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-            Type: discordgo.InteractionResponseChannelMessageWithSource,
-            Data: &discordgo.InteractionResponseData{
-                Content: "Error message for user",
-            },
-        })
-        return
-    }
-
-    s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-        Type: discordgo.InteractionResponseChannelMessageWithSource,
-        Data: &discordgo.InteractionResponseData{
-            Content: "Success message",
-        },
-    })
-}
-```
-
-**Context Helper**:
-
-- **Location**: `internal/server/commands/commands.go`
-- **Function**: `dbContext() (context.Context, context.CancelFunc)`
-- **MUST**: Use this helper for all database operations to ensure proper timeout handling
-- **MUST**: Always defer `cancel()` after calling `dbContext()`
+- MUST use `s.InteractionRespond` to respond.
+- MUST respond exactly once. If a response fails, log it.
+- MUST use user-friendly messages and say "server", not "guild".
+- MUST log failures before responding.
 
 ---
 
-## File Organization Summary
+## Link Rewriting
 
-### Database Files
+Location: `internal/server/commands/link.go`
 
-**Editable Files**:
+`RewriteLink` is a pure function. Keep it that way so it stays easy to test.
 
-- `internal/database/checkpoint_db.go` - Database interface definition (EDIT THIS)
-- `internal/database/queries/queries.sql` - SQL queries (EDIT THIS)
-- `internal/database/migrations/NNNNN_name.sql` - Migration files (EDIT THIS)
-- `internal/database/sqlite/sqlite_db.go` - SQLite implementation (EDIT THIS)
+Rules:
 
-**Generated Files (DO NOT EDIT)**:
+- Rewrite hosts only from the explicit allowlist.
+- Force HTTPS.
+- Remove query strings and fragments.
+- Preserve the path.
+- Do not fetch the URL. This avoids SSRF.
 
-- `internal/database/queries/queries.sql.go` - Generated by sqlc
-- `internal/database/queries/models.go` - Generated by sqlc
-- `internal/database/queries/db.go` - Generated by sqlc
-
-### Command Files
-
-- `internal/server/commands/commands.go` - Command registration infrastructure and `dbContext()` helper
-- `internal/server/commands/*.go` - Individual command implementations
-- **MUST**: Each command file have an `init()` function calling `registerCommand()`
-
-### Server Files
-
-- `internal/server/bot.go` - Bot initialization and lifecycle
-- Commands are registered via `CommandHandler.RegisterCommands()` in `Bot.Start()`
+Add new hosts to the switch in `RewriteLink` and add table-driven test cases.
 
 ---
 
-## Quick Reference Checklist
+## Mention Chat
 
-### Creating a New Command
+Location: `internal/server/chat.go`
 
-**MUST** complete all steps:
+Trigger conditions:
 
-1. Create command file in `internal/server/commands/`
-2. Define `Command` struct with `ApplicationCommand` and `Handler` fields
-3. **MUST**: Use `dbContext()` helper for all database calls (with `defer cancel()`)
-4. **MUST**: Log errors with context: `log.Error("action", "err", err, "key", value)`
-5. **MUST**: Respond to errors directly using `s.InteractionRespond()` with user-friendly messages
-6. **MUST**: Call `registerCommand()` in `init()` function
-7. **MUST**: Always respond to interactions using `s.InteractionRespond()`
+- The bot is mentioned, or
+- The message is a reply to a bot message, even without an explicit mention.
 
-### Creating a New Database Query
+Ignore:
 
-**MUST** complete all steps:
+- The bot's own messages.
+- Messages from any other bot.
+- DMs and messages outside guilds.
+- Messages that neither mention the bot nor reply to it.
 
-1. Add query to `internal/database/queries/queries.sql`
-2. **MUST**: Use `:one` annotation for Create operations (must return created record)
-3. **MUST**: Use `:exec` annotation for Update/Delete operations
-4. **MUST**: Run `go generate ./...` to regenerate sqlc code
-5. Add method to `CheckpointDatabase` interface in `checkpoint_db.go`
-6. **MUST**: Implement method in `internal/database/sqlite/sqlite_db.go` (convert sqlc return value to pointer)
-7. **MUST**: Run `go build ./...` to verify the project builds correctly
+Context rules:
 
-### Creating a New Migration
+- Plain mention: last `CHAT_CONTEXT_MESSAGES` messages before the mention.
+- Reply: the referenced message plus `CHAT_CONTEXT_MESSAGES - 1` messages before it.
+- Fall back to channel history if the referenced message is unavailable.
+- Include messages in chronological order.
+- Bot messages become `assistant` turns.
+- Other messages become `user` turns prefixed with the author's display name.
+- No system prompt is sent.
 
-**MUST** complete all steps:
+Response rules:
 
-1. Create file `NNNNN_name.sql` in `internal/database/migrations/` (follow naming pattern)
-2. **MUST**: Include `-- +goose Up` section for forward migration
-3. **MUST**: Include `-- +goose Down` section for rollback
-4. Migration runs automatically on database initialization
+- Reply to the triggering message.
+- Disable all mentions with `AllowedMentions` and `RepliedUser: false`.
+- Split responses over Discord's 2000-character limit, up to `CHAT_MAX_CHUNKS`.
+- Use a typing indicator while waiting.
+- Rate limit per user and cap concurrent requests.
+
+---
+
+## LLM Client
+
+Location: `internal/llm/openrouter.go`
+
+- OpenAI-compatible `POST /chat/completions` at OpenRouter.
+- No system message is added by the client.
+- Retry once on network errors, `429`, and `5xx`.
+- Never log the API key.
+- Return clear errors that include status and a short response body.
+- Keep the client independent of Discord types so it can be tested with `httptest`.
+
+---
+
+## Configuration
+
+Configuration uses Viper and dotenv.
+
+- Defaults and CLI flags live in `cmd/root.go`.
+- Environment variables override defaults.
+- `OPENROUTER_API_KEY` is environment-only and should never be added as a flag.
+- `.env` is gitignored. Keep `.env.example` current.
+- If the OpenRouter key is empty, mention chat is disabled and `/link` still works.
+
+---
+
+## Testing
+
+- Prefer pure functions for logic that can be tested without Discord.
+- Use interfaces for Discord and LLM dependencies in `chat.go`.
+- Use `httptest` for the OpenRouter client.
+- Do not call live Discord or OpenRouter APIs in tests.
+- Add table-driven cases for link rewriting.
+- Run `go test ./...`, `go vet ./...`, and `go build ./...` before finishing.
+
+---
+
+## Go Style
+
+- Keep packages small and focused.
+- Wrap errors with context using `%w`.
+- Use `context.Context` for network calls.
+- Avoid hidden global state except the command registry and rate limiter.
+- Use the built-in `min` instead of a custom helper.
+- Prefer explicit code over clever abstractions.

@@ -17,7 +17,7 @@ This monorepo contains the tooling and infrastructure for "The Coffee Break;" Di
 
 | Directory | Description |
 |-----------|-------------|
-| [`checkpoint-bot/`](./checkpoint-bot/) | Discord bot for checkpoint scheduling and goal tracking (Go) |
+| [`checkpoint-bot/`](./checkpoint-bot/) | Discord bot for link fixing and mention chat (Go) |
 | [`server-config/`](./server-config/) | Terraform configuration for Discord server structure |
 
 ## Quick Start
@@ -38,14 +38,13 @@ mise install
 
 ## Projects
 
-### Checkpoint Bot
+### Caffeinator (Checkpoint Bot)
 
-A lightweight Discord bot for accountability groups. Features checkpoint scheduling, goal tracking, and timezone support.
+A lightweight Discord bot for The Coffee Break. Fixes X/Twitter and Instagram links for better embeds, and chats when mentioned through OpenRouter.
 
 ```bash
 cd checkpoint-bot
 go mod download
-go generate ./...
 go build -o checkpoint-bot .
 ./checkpoint-bot --TOKEN="your-bot-token"
 ```

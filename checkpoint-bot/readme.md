@@ -1,184 +1,198 @@
 <div align="center">
   <img src=".github/Remote_Caffeinator.png" alt="Risk of Rain 2's remote caffeinator" width="200">
-  
-  # ☕ Caffeinator (Checkpoint Bot)
-  
-  **A Discord bot for accountability and goal tracking**
-  
+
+  # ☕ Caffeinator
+
+  **A small Discord bot for The Coffee Break**
+
   [![Go Version](https://img.shields.io/badge/go-1.25-blue.svg)](https://golang.org)
   [![License](https://img.shields.io/badge/license-MPL%202.0-brightgreen.svg)](LICENSE)
-  
+
 </div>
 
 ---
 
-## 📖 About
+## What it does
 
-**Caffeinator** is a Discord bot for accountability groups. Create scheduled checkpoints, set goals, and track progress together.
+Caffeinator is a lightweight, stateless Discord bot with two jobs:
 
-### ✨ Features
+- **Fix social links** so Discord renders proper embeds.
+- **Chat when mentioned** using an LLM through OpenRouter.
 
-- **📅 Checkpoint Management**: Create scheduled checkpoints with date/time support
-- **🎯 Goal Tracking**: Set and manage goals, mark status (completed/incomplete/failed)
-- **⏰ Timezone Support**: Automatic timezone handling per server
-- **👥 Multi-Server Support**: Works across multiple Discord servers
-- **⚡ Lightweight**: Built with Go—idles at 10-12MB RAM usage. (Unlike similar nodejs apps)
-- **📦 Portable Binary**: Database migrations are embedded—just build and run the binary anywhere, no external files needed.
+Checkpoint and goal tracking were removed. If that feature comes back, it will start from a fresh design.
 
 ---
 
-## 🛠️ Tech Stack
+## Commands
 
-- **Language**: [Go](https://golang.org) 1.25+
-- **Discord API**: [discordgo](https://github.com/bwmarrin/discordgo)
-- **Database**: SQLite with [sqlc](https://sqlc.dev) for type-safe queries (no ORM, just SQL)
-- **Migrations**: [goose](https://github.com/pressly/goose)
-- **Logging**: [charmbracelet/log](https://github.com/charmbracelet/log)
-- **CLI**: [Cobra](https://github.com/spf13/cobra)
+| Command | Description |
+|---|---|
+| `/link url:<url>` | Rewrites X/Twitter links to `fxtwitter.com` and Instagram links to `kkinstagram.com`, and removes tracking query parameters. |
+
+Examples:
+
+```text
+/link url:https://x.com/4ster_light/status/2116158570198622382?s=20
+→ https://fxtwitter.com/4ster_light/status/2116158570198622382
+
+/link url:https://www.instagram.com/p/ABC123/?igsh=tracking
+→ https://kkinstagram.com/p/ABC123
+```
+
+The rewritten link is posted publicly so everyone can click or preview it.
 
 ---
 
-## 🚀 Hosting
+## Mention chat
+
+Mention the bot, or reply to one of its messages, and it will answer through OpenRouter.
+
+- **Mention:** `@Caffeinator what do you think about this?`
+- **Reply:** reply directly to a bot message, with or without an `@`.
+
+Context behavior:
+
+- A plain mention includes the last 10 messages from the channel.
+- A reply uses the replied-to message plus up to 9 messages before it.
+- If the replied-to message is gone or inaccessible, it falls back to the last 10 messages before the mention.
+- Bot messages are sent as `assistant` turns. Everything else is a `user` turn with the author name prefixed.
+- No system prompt is sent.
+
+Other behavior:
+
+- Other bots and the bot's own messages are ignored.
+- Replies and mentions are rate limited per user.
+- Responses are capped at 3 Discord messages.
+- The model cannot ping `@everyone`, roles, or users in its reply.
+- Guild channels only for now.
+
+Messages in the context window are sent to OpenRouter. Do not mention the bot in channels where that is not acceptable.
+
+---
+
+## Setup
 
 ### Prerequisites
 
-- Discord bot token from [Discord Developer Portal](https://discord.com/developers/applications)
-- Docker (for Docker deployment) or Go 1.25+ (for building from source)
+- Go 1.25+ or Docker
+- A Discord application and bot token from the [Discord Developer Portal](https://discord.com/developers/applications)
+- An [OpenRouter](https://openrouter.ai/) API key for mention chat
 
-### Option 1: Docker
+### Required Discord settings
 
-Deploy using Docker for easy containerized hosting:
+1. Enable **Message Content Intent** under **Bot → Privileged Gateway Intents**.
+   Without it, the bot cannot read message text and will not respond to mentions.
+2. The bot needs these permissions:
+   - View Channels
+   - Send Messages
+   - Send Messages in Threads
+   - Read Message History
+
+The generated invite link requests exactly these permissions and includes the `bot` and `applications.commands` scopes.
+
+### Environment
+
+Copy `.env.example` to `.env` and fill it in, or set the same variables in your host:
+
+| Variable | Default | Description |
+|---|---|---|
+| `TOKEN` | required | Discord bot token |
+| `CLIENT_ID` | empty | Discord application client ID, used by `checkpoint invite` |
+| `CHANNEL_ID` | empty | Optional channel for startup notifications |
+| `STARTUP_MESSAGE` | `true` | Print startup info and send the restart notice |
+| `OPENROUTER_API_KEY` | empty | Enables mention chat when set |
+| `OPENROUTER_MODEL` | `deepseek/deepseek-v4.1-flash-1017` | OpenRouter model slug |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Override for testing |
+| `CHAT_ENABLED` | `true` | Set to `false` to disable mention chat |
+| `CHAT_CONTEXT_MESSAGES` | `10` | Messages to include, including the reply anchor |
+| `CHAT_MAX_TOKENS` | `1024` | Maximum output tokens |
+| `CHAT_MAX_CONTEXT_CHARS` | `20000` | Maximum context size in characters |
+| `CHAT_MAX_CHARS_PER_MESSAGE` | `4000` | Per-message context limit |
+| `CHAT_MAX_CHUNKS` | `3` | Maximum Discord messages per response |
+| `CHAT_TIMEOUT_SECONDS` | `60` | OpenRouter request timeout |
+| `CHAT_MAX_CONCURRENT` | `4` | Concurrent model requests |
+| `CHAT_RATE_LIMIT_CAPACITY` | `1` | Requests allowed per user per window |
+| `CHAT_RATE_LIMIT_SECONDS` | `5` | Rate limit window |
+
+If `OPENROUTER_API_KEY` is empty, the bot still runs and `/link` works. Mention chat is disabled with a startup warning.
+
+### Run from source
 
 ```bash
-git clone https://github.com/metruzanca/checkpoint-bot.git
-cd checkpoint-bot
+go mod download
+go build -o checkpoint-bot .
+./checkpoint-bot
+```
 
+### Docker
+
+```bash
 docker build -t caffeinator .
 docker run -d \
   --name caffeinator \
   -e TOKEN="your-bot-token" \
-  -v caffeinator-data:/app/db \
+  -e OPENROUTER_API_KEY="your-openrouter-key" \
   caffeinator
 ```
 
-### Option 2: Standalone Binary
+There is no database or volume to mount.
 
-Build and run the binary directly—perfect for VPS, dedicated servers, or any Linux/Windows/macOS system:
-
-```bash
-git clone https://github.com/metruzanca/checkpoint-bot.git
-cd checkpoint-bot
-go mod download
-go generate ./...
-go build -o checkpoint-bot .
-
-# Run the binary
-./checkpoint-bot --TOKEN="your-bot-token"
-```
-
-**Benefits of the standalone binary:**
-
-- Completely self-contained—migrations are embedded, no external files needed
-- Portable—move the binary anywhere and run it directly
-- Lightweight—single executable, no runtime dependencies
-- Database auto-created at `DB_PATH` (default: `./db/checkpoint.db`)
-
----
-
-## 💻 For Developers
-
-### Building from Source
+### Invite link
 
 ```bash
-git clone https://github.com/metruzanca/checkpoint-bot.git
-cd checkpoint-bot
-go mod download
-go generate ./..
-go build .
-./checkpoint-bot --TOKEN="your-bot-token" # TOKEN can also be in .env file or env variable if you prefer
+./checkpoint-bot invite
 ```
 
-### Configuration Options
-
-- `TOKEN` - Discord bot token (required)
-- `CLIENT_ID` - Discord application client ID (for invite links)
-- `DB_PATH` - Path to SQLite database file (default: `./db/checkpoint.db`)
-- `CHANNEL_ID` - Optional channel ID for startup notifications
-- `STARTUP_MESSAGE` - Enable/disable startup messages (default: `true`)
+or, while the bot is running with `STARTUP_MESSAGE=true`, the invite link is printed on startup.
 
 ---
 
-## 📚 Usage
+## Development
 
-### Commands
+### Project structure
 
-- **`/checkpoint`** - Create a scheduled checkpoint
-
-  - `date` (required): `YYYY-MM-DD` format
-  - `time` (required): `HH:MM` or `H:MM AM/PM` format
-  - Example: `/checkpoint date:2024-01-15 time:7:00 PM`
-
-- **`/goal`** - Set or edit goals for upcoming checkpoint
-
-  - `user` (optional): User whose goals to edit (admin only)
-  - `status` (optional): `completed`, `incomplete`, or `failed`
-
-- **`/next`** - View next upcoming checkpoint and goals
-
----
-
-## 🏗️ Project Structure
-
-```
+```text
 checkpoint-bot/
-├── cmd/                    # CLI commands
+├── cmd/                       # CLI commands (run, invite, command clear)
 ├── internal/
-│   ├── config/            # Configuration
-│   ├── database/          # Database layer (sqlc + goose migrations)
-│   ├── server/            # Bot & Discord command handlers
-│   └── util/              # Utilities
-└── main.go                # Entry point
+│   ├── config/                # Viper and dotenv configuration
+│   ├── llm/                   # OpenRouter client
+│   ├── ratelimit/             # Shared token bucket limiter
+│   ├── server/                # Bot lifecycle and mention chat
+│   │   └── commands/          # Slash commands
+│   └── util/                  # Small helpers
+└── main.go
 ```
 
-**Key Points**: SQL queries in `queries.sql` (generated by sqlc), commands in `internal/server/commands/`, migrations in `internal/database/migrations/`
+### Adding a slash command
+
+1. Create a file in `internal/server/commands/`.
+2. Define a `Command` with `ApplicationCommand` and a `Handler`.
+3. Register it in `init()` with `registerCommand(...)`.
+4. Run `go test ./...` and `go vet ./...`.
+
+### Tests
+
+```bash
+go test ./...
+go vet ./...
+```
+
+The suite covers link rewriting, context assembly, mention detection, response chunking, rate limiting, and the OpenRouter client (with `httptest`, no live API calls).
+
+### Logging
+
+Use `github.com/charmbracelet/log` with key-value pairs:
+
+```go
+log.Info("chat request", "channel", channelID, "user", userID)
+log.Error("request failed", "err", err, "channel", channelID)
+```
+
+Do not log message contents or API keys.
 
 ---
 
-## 🧪 Development
+## License
 
-### Adding a Command
-
-1. Create file in `internal/server/commands/`
-2. Define `ApplicationCommand` and `Handler`
-3. Register in `init()` with `registerCommand()`
-4. Use `dbContext()` for database ops (with `defer cancel()`)
-
-### Adding a Database Query
-
-1. Add query to `internal/database/queries/queries.sql`
-2. Use `:one` for Create (returns record), `:exec` for Update/Delete
-3. Run `go generate ./...` to regenerate sqlc code
-4. Add method to `CheckpointDatabase` interface and implement in SQLite
-
-### Migrations
-
-Create `NNNNN_name.sql` in `internal/database/migrations/` with `-- +goose Up` and `-- +goose Down` sections. Migrations run automatically on startup.
-
----
-
-## 📚 Resources
-
-- [DiscordGo Examples](https://github.com/bwmarrin/discordgo/tree/master/examples)
-- [Awesome DiscordGo](https://github.com/bwmarrin/discordgo/wiki/Awesome-DiscordGo)
-
----
-
-## 📝 License
-
-This project is licensed under the Mozilla Public License 2.0 (MPL-2.0).
-
----
-
-<div align="center">
-  <sub>Built with ☕ and ❤️ for accountability groups everywhere</sub>
-</div>
+Mozilla Public License 2.0 (MPL-2.0). See [LICENSE](LICENSE).
