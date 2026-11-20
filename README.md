@@ -40,7 +40,7 @@ mise install
 
 ### Caffeinator (Checkpoint Bot)
 
-A lightweight Discord bot for The Coffee Break. Fixes X/Twitter and Instagram links for better embeds, and chats when mentioned through OpenRouter.
+A lightweight Discord bot for The Coffee Break. Fixes X/Twitter and Instagram links for better embeds, chats when mentioned through OpenRouter, and slowly learns durable facts from conversations it is invoked in.
 
 ```bash
 cd checkpoint-bot

@@ -4,6 +4,8 @@ tmp
 checkpoint-bot
 # Legacy checkpoint database
 db
+# Local bot memory
+/memory/
 # Local environment
 .env
 .env.*

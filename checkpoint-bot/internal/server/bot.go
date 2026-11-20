@@ -8,6 +8,7 @@ import (
 	"github.com/bwmarrin/discordgo"
 	"github.com/charmbracelet/log"
 	"github.com/metruzanca/checkpoint-bot/internal/llm"
+	"github.com/metruzanca/checkpoint-bot/internal/memory"
 	"github.com/metruzanca/checkpoint-bot/internal/server/commands"
 	"github.com/metruzanca/checkpoint-bot/internal/util"
 	"github.com/spf13/viper"
@@ -87,6 +88,12 @@ func (b *Bot) Start() error {
 	}
 
 	b.CommandHandler = commands.NewCommandHandler(b.DiscordClient)
+	if b.chat != nil {
+		b.CommandHandler.Chat = b.chat
+		if b.chat.memory != nil {
+			b.CommandHandler.Memory = b.chat.memory
+		}
+	}
 	b.CommandHandler.RegisterCommands()
 
 	b.DiscordClient.AddHandler(b.onGuildJoined)
@@ -121,6 +128,30 @@ func newChatFromConfig(session *discordgo.Session) *Chat {
 		systemPrompt = defaultSystemPrompt
 	}
 
+	var memoryStore *memory.Store
+	var memoryExtractor *memory.Extractor
+	if viper.GetBool("MEMORY_ENABLED") {
+		var err error
+		memoryStore, err = memory.NewStore(
+			viper.GetString("MEMORY_DIR"),
+			viper.GetInt("MEMORY_MAX_CONTEXT_CHARS"),
+		)
+		if err != nil {
+			log.Error("memory disabled", "err", err)
+			memoryStore = nil
+		}
+	}
+	if memoryStore != nil {
+		extractorClient := &llm.Client{
+			APIKey:       apiKey,
+			Model:        model,
+			BaseURL:      baseURL,
+			MaxTokens:    1024,
+			SystemPrompt: memory.ExtractionSystemPrompt,
+		}
+		memoryExtractor = memory.NewExtractor(extractorClient, viper.GetFloat64("MEMORY_MIN_CONFIDENCE"))
+	}
+
 	webSearchMaxResults := viper.GetInt("OPENROUTER_WEB_SEARCH_MAX_RESULTS")
 	if webSearchMaxResults < 1 {
 		webSearchMaxResults = 3
@@ -142,22 +173,35 @@ func newChatFromConfig(session *discordgo.Session) *Chat {
 	}
 
 	cfg := ChatConfig{
-		ContextMessages:    viper.GetInt("CHAT_CONTEXT_MESSAGES"),
-		MaxContextChars:    viper.GetInt("CHAT_MAX_CONTEXT_CHARS"),
-		MaxCharsPerMessage: viper.GetInt("CHAT_MAX_CHARS_PER_MESSAGE"),
-		MaxChunks:          viper.GetInt("CHAT_MAX_CHUNKS"),
-		Timeout:            time.Duration(viper.GetInt("CHAT_TIMEOUT_SECONDS")) * time.Second,
-		RateLimitCapacity:  viper.GetInt("CHAT_RATE_LIMIT_CAPACITY"),
-		RateLimitWindow:    time.Duration(viper.GetInt("CHAT_RATE_LIMIT_SECONDS")) * time.Second,
-		MaxConcurrent:      viper.GetInt("CHAT_MAX_CONCURRENT"),
+		ContextMessages:       viper.GetInt("CHAT_CONTEXT_MESSAGES"),
+		MaxContextChars:       viper.GetInt("CHAT_MAX_CONTEXT_CHARS"),
+		MaxCharsPerMessage:    viper.GetInt("CHAT_MAX_CHARS_PER_MESSAGE"),
+		MaxChunks:             viper.GetInt("CHAT_MAX_CHUNKS"),
+		Timeout:               time.Duration(viper.GetInt("CHAT_TIMEOUT_SECONDS")) * time.Second,
+		RateLimitCapacity:     viper.GetInt("CHAT_RATE_LIMIT_CAPACITY"),
+		RateLimitWindow:       time.Duration(viper.GetInt("CHAT_RATE_LIMIT_SECONDS")) * time.Second,
+		MaxConcurrent:         viper.GetInt("CHAT_MAX_CONCURRENT"),
+		SystemPrompt:          systemPrompt,
+		Memory:                memoryStore,
+		Extractor:             memoryExtractor,
+		MemoryMaxContextChars: viper.GetInt("MEMORY_MAX_CONTEXT_CHARS"),
+		MemoryExtractTimeout:  time.Duration(viper.GetInt("MEMORY_EXTRACT_TIMEOUT_SECONDS")) * time.Second,
+	}
+
+	memoryEnabled := memoryStore != nil
+	memoryDir := ""
+	if memoryEnabled {
+		memoryDir = memoryStore.Dir()
 	}
 
 	log.Info("chat enabled",
 		"model", model,
-		"system_prompt_chars", len([]rune(client.SystemPrompt)),
+		"system_prompt_chars", len([]rune(systemPrompt)),
 		"web_search", client.WebSearch,
 		"web_search_max_results", client.WebSearchMaxResults,
 		"web_search_max_uses", client.WebSearchMaxUses,
+		"memory_enabled", memoryEnabled,
+		"memory_dir", memoryDir,
 	)
 	return newChat(session, client, cfg)
 }

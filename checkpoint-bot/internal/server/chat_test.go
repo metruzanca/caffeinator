@@ -9,6 +9,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/metruzanca/checkpoint-bot/internal/llm"
+	"github.com/metruzanca/checkpoint-bot/internal/memory"
+	"github.com/metruzanca/checkpoint-bot/internal/server/commands"
 	"github.com/stretchr/testify/require"
 )
 
@@ -54,17 +56,36 @@ func (f *fakeChatSession) ChannelMessageSendComplex(channelID string, data *disc
 	return &discordgo.Message{}, nil
 }
 
+type fakeExtractor struct {
+	calls  int
+	facts  []memory.Fact
+	err    error
+	gotTxt string
+}
+
+func (f *fakeExtractor) Extract(ctx context.Context, transcript string, subjects map[string]string) ([]memory.Fact, error) {
+	f.calls++
+	f.gotTxt = transcript
+	return f.facts, f.err
+}
+
 type fakeChatClient struct {
-	response string
-	err      error
-	calls    int
-	got      []llm.Message
-	called   chan []llm.Message
+	response     string
+	systemPrompt string
+	err          error
+	calls        int
+	got          []llm.Message
+	called       chan []llm.Message
 }
 
 func (f *fakeChatClient) Chat(ctx context.Context, messages []llm.Message) (string, llm.Usage, error) {
+	return f.ChatWithSystem(ctx, "", messages)
+}
+
+func (f *fakeChatClient) ChatWithSystem(ctx context.Context, systemPrompt string, messages []llm.Message) (string, llm.Usage, error) {
 	f.calls++
 	f.got = messages
+	f.systemPrompt = systemPrompt
 	if f.called != nil {
 		f.called <- messages
 	}
@@ -140,7 +161,7 @@ func TestGatherContextWithoutReply(t *testing.T) {
 	}
 	chat := newChat(session, &fakeChatClient{}, ChatConfig{ContextMessages: 10})
 
-	messages := chat.gatherContext(testMessage("3", "channel", "guild", "alice", "<@bot> hi"), nil)
+	messages := chat.gatherContext(testMessage("3", "channel", "guild", "alice", "<@bot> hi"), nil, 10)
 
 	require.Len(t, messages, 2)
 	require.Equal(t, "1", messages[0].ID)
@@ -165,7 +186,7 @@ func TestGatherContextUsesReplyAnchor(t *testing.T) {
 	}
 	chat := newChat(session, &fakeChatClient{}, ChatConfig{ContextMessages: 3})
 
-	messages := chat.gatherContext(testMessage("3", "channel", "guild", "alice", "<@bot> hi"), referenced)
+	messages := chat.gatherContext(testMessage("3", "channel", "guild", "alice", "<@bot> hi"), referenced, 3)
 
 	require.Len(t, messages, 3)
 	require.Equal(t, "p1", messages[0].ID)
@@ -179,7 +200,7 @@ func TestGatherContextFallsBackWhenHistoryFails(t *testing.T) {
 	session := &fakeChatSession{historyErr: errors.New("no access")}
 	chat := newChat(session, &fakeChatClient{}, ChatConfig{ContextMessages: 5})
 
-	messages := chat.gatherContext(testMessage("3", "channel", "guild", "alice", "<@bot> hi"), nil)
+	messages := chat.gatherContext(testMessage("3", "channel", "guild", "alice", "<@bot> hi"), nil, 5)
 
 	require.Nil(t, messages)
 }
@@ -359,6 +380,173 @@ func TestSendDisablesMentionsAndReferencesMessage(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("message was not sent")
 	}
+}
+
+func TestAskUsesMemory(t *testing.T) {
+	store, err := memory.NewStore(t.TempDir(), 1000)
+	require.NoError(t, err)
+	require.NoError(t, store.AppendFacts([]memory.Fact{
+		{
+			SubjectID:   "123",
+			SubjectName: "Alice",
+			Text:        "Building a Go Discord bot.",
+			Category:    "work",
+			Confidence:  0.9,
+		},
+		{
+			SubjectID:   "server",
+			SubjectName: "server",
+			Text:        "The server is for developers.",
+			Category:    "server",
+			Confidence:  0.9,
+		},
+	}))
+
+	client := &fakeChatClient{response: "hello"}
+	chat := newChat(&fakeChatSession{}, client, ChatConfig{
+		ContextMessages: 10,
+		SystemPrompt:    "base prompt",
+		Memory:          store,
+	})
+
+	content, err := chat.Ask(context.Background(), commands.ChatRequest{
+		GuildID:       "guild",
+		ChannelID:     "channel",
+		UserID:        "123",
+		DisplayName:   "Alice",
+		BotID:         "bot",
+		Text:          "what am I working on?",
+		HistoryLength: 10,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "hello", content)
+	require.Contains(t, client.systemPrompt, "base prompt")
+	require.Contains(t, client.systemPrompt, "Building a Go Discord bot.")
+	require.Contains(t, client.systemPrompt, "The server is for developers.")
+}
+
+func TestAskDisableMemorySkipsMemory(t *testing.T) {
+	store, err := memory.NewStore(t.TempDir(), 1000)
+	require.NoError(t, err)
+	require.NoError(t, store.AppendFacts([]memory.Fact{{
+		SubjectID:   "123",
+		SubjectName: "Alice",
+		Text:        "Building a Go Discord bot.",
+		Category:    "work",
+		Confidence:  0.9,
+	}}))
+
+	client := &fakeChatClient{response: "hello"}
+	chat := newChat(&fakeChatSession{}, client, ChatConfig{
+		ContextMessages: 10,
+		SystemPrompt:    "base prompt",
+		Memory:          store,
+	})
+
+	_, err = chat.Ask(context.Background(), commands.ChatRequest{
+		GuildID:       "guild",
+		ChannelID:     "channel",
+		UserID:        "123",
+		DisplayName:   "Alice",
+		BotID:         "bot",
+		Text:          "what am I working on?",
+		HistoryLength: 10,
+		DisableMemory: true,
+	})
+	require.NoError(t, err)
+	require.Contains(t, client.systemPrompt, "base prompt")
+	require.NotContains(t, client.systemPrompt, "Building a Go Discord bot.")
+}
+
+func TestAskStoresMemoryWhenEnabled(t *testing.T) {
+	store, err := memory.NewStore(t.TempDir(), 1000)
+	require.NoError(t, err)
+
+	extractor := &fakeExtractor{facts: []memory.Fact{{
+		SubjectID:   "123",
+		SubjectName: "Alice",
+		Text:        "Building a Go Discord bot.",
+		Category:    "work",
+		Confidence:  0.9,
+	}}}
+
+	client := &fakeChatClient{response: "hello"}
+	chat := newChat(&fakeChatSession{}, client, ChatConfig{
+		ContextMessages: 10,
+		SystemPrompt:    "base prompt",
+		Memory:          store,
+		Extractor:       extractor,
+	})
+
+	_, err = chat.Ask(context.Background(), commands.ChatRequest{
+		GuildID:       "guild",
+		ChannelID:     "channel",
+		UserID:        "123",
+		DisplayName:   "Alice",
+		BotID:         "bot",
+		Text:          "I am building a Go bot.",
+		HistoryLength: 10,
+	})
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		text, err := store.Get("123")
+		return err == nil && strings.Contains(text, "Building a Go Discord bot.")
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestAskDisableMemorySkipsExtraction(t *testing.T) {
+	store, err := memory.NewStore(t.TempDir(), 1000)
+	require.NoError(t, err)
+
+	extractor := &fakeExtractor{facts: []memory.Fact{{
+		SubjectID: "123",
+		Text:      "Should not be stored.",
+	}}}
+
+	client := &fakeChatClient{response: "hello"}
+	chat := newChat(&fakeChatSession{}, client, ChatConfig{
+		ContextMessages: 10,
+		SystemPrompt:    "base prompt",
+		Memory:          store,
+		Extractor:       extractor,
+	})
+
+	_, err = chat.Ask(context.Background(), commands.ChatRequest{
+		GuildID:       "guild",
+		ChannelID:     "channel",
+		UserID:        "123",
+		DisplayName:   "Alice",
+		BotID:         "bot",
+		Text:          "Do not remember this.",
+		HistoryLength: 10,
+		DisableMemory: true,
+	})
+	require.NoError(t, err)
+
+	time.Sleep(50 * time.Millisecond)
+	require.Equal(t, 0, extractor.calls)
+
+	text, err := store.Get("123")
+	require.NoError(t, err)
+	require.Empty(t, text)
+}
+
+func TestCollectSubjectsIncludesHistoryAuthors(t *testing.T) {
+	message := testMessage("1", "channel", "guild", "111", "hello <@456>")
+	message.Author.Username = "alice"
+	history := []*discordgo.Message{
+		{Author: &discordgo.User{ID: "222", Username: "bob"}},
+		{Author: &discordgo.User{ID: "999", Username: "bot", Bot: true}},
+	}
+
+	subjects := collectSubjects(message, nil, "hello <@456>", "bot", history)
+
+	require.Contains(t, subjects, "server")
+	require.Contains(t, subjects, "111")
+	require.Contains(t, subjects, "222")
+	require.Contains(t, subjects, "456")
+	require.NotContains(t, subjects, "999")
 }
 
 func TestMentionsUser(t *testing.T) {

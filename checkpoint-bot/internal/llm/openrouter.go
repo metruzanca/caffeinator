@@ -82,9 +82,13 @@ type chatResponse struct {
 	} `json:"error"`
 }
 
-// Chat sends the conversation to OpenRouter and returns the assistant text.
-// A system prompt is prepended when SystemPrompt is set.
+// Chat sends the conversation to OpenRouter using the client's system prompt.
 func (c *Client) Chat(ctx context.Context, messages []Message) (string, Usage, error) {
+	return c.ChatWithSystem(ctx, c.SystemPrompt, messages)
+}
+
+// ChatWithSystem sends the conversation with the given system prompt.
+func (c *Client) ChatWithSystem(ctx context.Context, systemPrompt string, messages []Message) (string, Usage, error) {
 	if strings.TrimSpace(c.APIKey) == "" {
 		return "", Usage{}, errors.New("openrouter API key is empty")
 	}
@@ -95,7 +99,7 @@ func (c *Client) Chat(ctx context.Context, messages []Message) (string, Usage, e
 		return "", Usage{}, errors.New("no messages to send")
 	}
 
-	if systemPrompt := strings.TrimSpace(c.SystemPrompt); systemPrompt != "" {
+	if systemPrompt = strings.TrimSpace(systemPrompt); systemPrompt != "" {
 		messages = append([]Message{{
 			Role:    "system",
 			Content: systemPrompt,

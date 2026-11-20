@@ -27,7 +27,7 @@ var LinkCmd = &Command{
 			},
 		},
 	},
-	Handler: func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	Handler: func(_ *CommandHandler, s *discordgo.Session, i *discordgo.InteractionCreate) {
 		var rawURL string
 		for _, opt := range i.ApplicationCommandData().Options {
 			if opt.Name == "url" {
@@ -128,6 +128,10 @@ func respondEphemeral(s *discordgo.Session, i *discordgo.InteractionCreate, mess
 		Data: &discordgo.InteractionResponseData{
 			Content: message,
 			Flags:   discordgo.MessageFlagsEphemeral,
+			AllowedMentions: &discordgo.MessageAllowedMentions{
+				Parse:       []discordgo.AllowedMentionType{},
+				RepliedUser: false,
+			},
 		},
 	}); err != nil {
 		log.Error("cannot respond to interaction", "err", err, "channel", i.ChannelID)

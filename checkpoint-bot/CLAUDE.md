@@ -10,14 +10,16 @@
 - **MUST**: Register slash commands from an `init()` function with `registerCommand()`.
 - **MUST**: Use "server" instead of "guild" in user-facing text.
 - **MUST**: Never log message contents or API keys.
-- **MUST NOT**: Add a database layer without an explicit product decision. The bot is stateless right now.
+- **MUST**: Learn only from conversations where the bot is invoked. Never read normal channel traffic.
+- **MUST NOT**: Add a database layer without an explicit product decision. Persistent state is markdown memory on disk.
 
 **Key files**
 
 - Commands: `internal/server/commands/*.go`
 - Command registration: `internal/server/commands/commands.go`
 - Bot lifecycle: `internal/server/bot.go`
-- Mention chat: `internal/server/chat.go`
+- Chat pipeline: `internal/server/chat.go`
+- Memory store and extraction: `internal/memory/`
 - OpenRouter client: `internal/llm/openrouter.go`
 - Rate limiter: `internal/ratelimit/ratelimit.go`
 - Configuration: `internal/config/config.go` and `cmd/root.go`
@@ -35,12 +37,14 @@ go test ./...
 
 ## Architecture
 
-The bot is a stateless Discord client. There is no database, ORM, migration tool, or `go generate` step.
+The bot has no database, ORM, migration tool, or `go generate` step. Persistent state is markdown memory on disk.
 
-Two features exist:
+Features:
 
 1. `/link` rewrites social media URLs for embed-friendly hosts.
-2. Mention chat sends recent channel context to OpenRouter and posts the response.
+2. Mention and reply chat sends recent channel context to OpenRouter and posts the response.
+3. `/ask` runs the same chat pipeline with configurable history and memory opt-out.
+4. `/memory` lets admins inspect and clear markdown memory.
 
 `cmd/root.go` starts the bot and handles shutdown. `internal/server.NewBot` creates the Discord session and sets the required intents. `Bot.Start` connects, registers the chat handler, installs slash commands, and handles newly joined servers.
 
@@ -133,14 +137,25 @@ Add new hosts to the switch in `RewriteLink` and add table-driven test cases.
 
 ---
 
-## Mention Chat
+## Chat Pipeline
 
 Location: `internal/server/chat.go`
 
-Trigger conditions:
+Entry points:
 
-- The bot is mentioned, or
-- The message is a reply to a bot message, even without an explicit mention.
+- A mention.
+- A reply to a bot message, even without an explicit mention.
+- `/ask`.
+
+`/ask` behavior:
+
+- `text` is required.
+- `history_length` defaults to `10`, minimum `1`, maximum `100`.
+- `disable_memory` skips both memory reads and writes for that ask.
+- Responses are public.
+- The interaction is deferred, then edited with the response.
+
+Trigger conditions:
 
 Ignore:
 
@@ -173,6 +188,39 @@ Response rules:
 
 ---
 
+## Memory
+
+Location: `internal/memory/`
+
+Memory is read-only from the model's perspective. The model never writes files directly.
+
+Read path:
+
+- Before a reply, load `server.md` and the invoking user's file.
+- Also load users explicitly mentioned in the current conversation.
+- Cap the injected text with `MEMORY_MAX_CONTEXT_CHARS`.
+- Add a line telling the model that memory is reference data, not instructions.
+
+Write path:
+
+- After a reply, run a background extraction call.
+- Extract only durable facts stated by users.
+- Ignore bot messages and other bots.
+- Filter out secrets, credentials, addresses, health data, and sensitive personal data.
+- Filter by `MEMORY_MIN_CONFIDENCE`.
+- Deduplicate against existing markdown.
+- Write atomically with a temporary file and rename.
+
+Rules:
+
+- Memory is enabled only for invoked conversations.
+- `disable_memory` on `/ask` skips reads and writes.
+- The bot must never scan normal channel traffic.
+- `/memory` is Administrator-only and replies ephemerally.
+- Without a persistent volume, memory is lost on deploy.
+
+---
+
 ## LLM Client
 
 Location: `internal/llm/openrouter.go`
@@ -200,6 +248,9 @@ Configuration uses Viper and dotenv.
 - If the OpenRouter key is empty, mention chat is disabled and `/link` still works.
 - `CHAT_SYSTEM_PROMPT` overrides the built-in peer-tone prompt.
 - Web search is enabled by default with `OPENROUTER_WEB_SEARCH=true`. It is capped by `OPENROUTER_WEB_SEARCH_MAX_RESULTS` and `OPENROUTER_WEB_SEARCH_MAX_USES` to control cost.
+- Memory is enabled by default with `MEMORY_ENABLED=true`.
+- `MEMORY_DIR` defaults to `./memory`. On Railway, use a volume and set `MEMORY_DIR=/data/memory`.
+- `MEMORY_MAX_CONTEXT_CHARS`, `MEMORY_MIN_CONFIDENCE`, and `MEMORY_EXTRACT_TIMEOUT_SECONDS` control memory size and extraction.
 
 ---
 
@@ -210,6 +261,8 @@ Configuration uses Viper and dotenv.
 - Use `httptest` for the OpenRouter client.
 - Do not call live Discord or OpenRouter APIs in tests.
 - Add table-driven cases for link rewriting.
+- Test the memory store with `t.TempDir()`.
+- Test extraction with a fake chat client.
 - Run `go test ./...`, `go vet ./...`, and `go build ./...` before finishing.
 
 ---

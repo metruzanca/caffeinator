@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -11,15 +12,41 @@ import (
 // Global mutable map, only modified in init() functions.
 var commands = make(map[string]*Command)
 
+// ChatRequest describes one chat request from a slash command.
+type ChatRequest struct {
+	GuildID       string
+	ChannelID     string
+	UserID        string
+	DisplayName   string
+	BotID         string
+	Text          string
+	HistoryLength int
+	DisableMemory bool
+}
+
+// ChatService is the chat pipeline used by slash commands.
+type ChatService interface {
+	Ask(ctx context.Context, req ChatRequest) (string, error)
+}
+
+// MemoryService is the memory store used by the memory command.
+type MemoryService interface {
+	Get(subjectID string) (string, error)
+	Forget(subjectID string) error
+	ListUsers() ([]string, error)
+}
+
 // CommandHandler manages Discord slash command registration and execution.
 type CommandHandler struct {
 	DiscordClient *discordgo.Session
+	Chat          ChatService
+	Memory        MemoryService
 }
 
 // Command represents a Discord slash command with its handler function.
 type Command struct {
 	discordgo.ApplicationCommand
-	Handler func(s *discordgo.Session, i *discordgo.InteractionCreate)
+	Handler func(h *CommandHandler, s *discordgo.Session, i *discordgo.InteractionCreate)
 }
 
 // NewCommandHandler creates a command handler and removes commands that no
@@ -70,7 +97,7 @@ func (h *CommandHandler) RegisterCommands() {
 		}
 
 		log.Info("command executed", "command", commandName, "channel", i.ChannelID, "guild", i.GuildID, "user", userID)
-		cmd.Handler(s, i)
+		cmd.Handler(h, s, i)
 	})
 }
 

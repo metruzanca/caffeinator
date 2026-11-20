@@ -64,6 +64,11 @@ func init() {
 	viper.SetDefault("CHAT_MAX_CONCURRENT", 4)
 	viper.SetDefault("CHAT_RATE_LIMIT_CAPACITY", 1)
 	viper.SetDefault("CHAT_RATE_LIMIT_SECONDS", 5)
+	viper.SetDefault("MEMORY_ENABLED", true)
+	viper.SetDefault("MEMORY_DIR", "./memory")
+	viper.SetDefault("MEMORY_MAX_CONTEXT_CHARS", 3000)
+	viper.SetDefault("MEMORY_MIN_CONFIDENCE", 0.7)
+	viper.SetDefault("MEMORY_EXTRACT_TIMEOUT_SECONDS", 30)
 
 	rootCmd.PersistentFlags().String("TOKEN", "", "Discord bot token (required)")
 	rootCmd.PersistentFlags().String("LOG_FORMAT", "", "Log format: text or json (auto json on Railway)")
@@ -85,4 +90,9 @@ func init() {
 	rootCmd.PersistentFlags().Int("CHAT_MAX_CONCURRENT", 4, "Maximum concurrent chat requests")
 	rootCmd.PersistentFlags().Int("CHAT_RATE_LIMIT_CAPACITY", 1, "Chat requests allowed per user per rate limit window")
 	rootCmd.PersistentFlags().Int("CHAT_RATE_LIMIT_SECONDS", 5, "Chat rate limit window in seconds")
+	rootCmd.PersistentFlags().Bool("MEMORY_ENABLED", true, "Enable markdown memory")
+	rootCmd.PersistentFlags().String("MEMORY_DIR", "./memory", "Directory for markdown memory files")
+	rootCmd.PersistentFlags().Int("MEMORY_MAX_CONTEXT_CHARS", 3000, "Maximum memory characters injected into a chat request")
+	rootCmd.PersistentFlags().Float64("MEMORY_MIN_CONFIDENCE", 0.7, "Minimum confidence for a stored memory fact")
+	rootCmd.PersistentFlags().Int("MEMORY_EXTRACT_TIMEOUT_SECONDS", 30, "Memory extraction timeout in seconds")
 }

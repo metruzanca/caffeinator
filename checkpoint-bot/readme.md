@@ -30,6 +30,8 @@ Checkpoint and goal tracking were removed. If that feature comes back, it will s
 | Command | Description |
 |---|---|
 | `/link url:<url>` | Rewrites X/Twitter links to `fxtwitter.com` and Instagram links to `kkinstagram.com`, and removes tracking query parameters. |
+| `/ask text:<text> [history_length] [disable_memory]` | Runs the same chat pipeline as a mention. `history_length` defaults to 10 and can go up to 100. Set `disable_memory` to skip memory reads and writes for that ask. Responses are public. |
+| `/memory view\|forget\|list` | Admin-only memory management. Responses are ephemeral, so only the invoker sees them. |
 
 Examples:
 
@@ -76,6 +78,80 @@ Other behavior:
 - Guild channels only for now.
 
 Messages in the context window are sent to OpenRouter. Do not mention the bot in channels where that is not acceptable.
+
+---
+
+## Ask command
+
+`/ask` uses the same pipeline as a mention, with two extra controls.
+
+- `history_length` defaults to `10`. It can be raised to `100` for more channel context.
+- `disable_memory` skips both memory reads and memory writes for that ask.
+- Responses are public, so everyone in the channel can see them.
+
+Example:
+
+```text
+/ask text:what did we decide about the deploy? history_length:30
+```
+
+---
+
+## Memory
+
+The bot slowly learns durable facts from conversations it is invoked in. It never reads normal channel traffic.
+
+It learns from:
+
+- Mentions.
+- Replies to the bot.
+- `/ask`, unless `disable_memory` is set.
+
+Memory is stored as markdown on disk:
+
+```text
+memory/server.md
+memory/users/123456789.md
+```
+
+Each user file is human-readable and can be edited by hand. Example:
+
+```markdown
+# Alice (123456789)
+
+- 2026-11-20 [work]: Building a Go Discord bot.
+- 2026-11-20 [preference]: Prefers short answers.
+```
+
+How it works:
+
+- Before replying, the bot loads the invoking user's memory and server memory.
+- After replying, a background model call extracts high-confidence facts from the conversation.
+- Facts are deduplicated, filtered for sensitive data, and appended to the markdown files.
+- The bot does not learn from its own replies.
+- `disable_memory` on `/ask` skips both reads and writes for that ask.
+
+Admin memory management:
+
+```text
+/memory view [user]
+/memory forget [user]
+/memory list
+```
+
+`/memory` requires Administrator permission and always replies ephemerally. Omit `user` to view or clear server memory.
+
+### Memory storage
+
+Memory needs persistent storage. On Railway, mount a volume at `/data` and set:
+
+```text
+MEMORY_DIR=/data/memory
+```
+
+Without a volume, memory is written inside the container and lost on the next deploy.
+
+For local development, the default is `./memory`.
 
 ---
 
@@ -127,6 +203,11 @@ Copy `.env.example` to `.env` and fill it in, or set the same variables in your 
 | `CHAT_MAX_CONCURRENT` | `4` | Concurrent model requests |
 | `CHAT_RATE_LIMIT_CAPACITY` | `1` | Requests allowed per user per window |
 | `CHAT_RATE_LIMIT_SECONDS` | `5` | Rate limit window |
+| `MEMORY_ENABLED` | `true` | Enable markdown memory |
+| `MEMORY_DIR` | `./memory` | Memory directory. Use `/data/memory` with a Railway volume |
+| `MEMORY_MAX_CONTEXT_CHARS` | `3000` | Maximum memory characters injected into a chat request |
+| `MEMORY_MIN_CONFIDENCE` | `0.7` | Minimum confidence for a stored fact |
+| `MEMORY_EXTRACT_TIMEOUT_SECONDS` | `30` | Background memory extraction timeout |
 
 If `OPENROUTER_API_KEY` is empty, the bot still runs and `/link` works. Mention chat is disabled with a startup warning.
 
@@ -171,8 +252,9 @@ checkpoint-bot/
 ├── internal/
 │   ├── config/                # Viper and dotenv configuration
 │   ├── llm/                   # OpenRouter client
+│   ├── memory/                # Markdown memory store and extraction
 │   ├── ratelimit/             # Shared token bucket limiter
-│   ├── server/                # Bot lifecycle and mention chat
+│   ├── server/                # Bot lifecycle and chat pipeline
 │   │   └── commands/          # Slash commands
 │   └── util/                  # Small helpers
 └── main.go
@@ -192,7 +274,7 @@ go test ./...
 go vet ./...
 ```
 
-The suite covers link rewriting, context assembly, mention detection, response chunking, rate limiting, and the OpenRouter client (with `httptest`, no live API calls).
+The suite covers link rewriting, context assembly, mention detection, `/ask`, memory storage and extraction, response chunking, rate limiting, and the OpenRouter client (with `httptest`, no live API calls).
 
 ### Logging
 
