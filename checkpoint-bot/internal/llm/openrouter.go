@@ -52,6 +52,7 @@ type Client struct {
 	Model               string
 	BaseURL             string
 	MaxTokens           int
+	SystemPrompt        string
 	WebSearch           bool
 	WebSearchMaxResults int
 	WebSearchMaxUses    int
@@ -82,7 +83,7 @@ type chatResponse struct {
 }
 
 // Chat sends the conversation to OpenRouter and returns the assistant text.
-// No system prompt is added.
+// A system prompt is prepended when SystemPrompt is set.
 func (c *Client) Chat(ctx context.Context, messages []Message) (string, Usage, error) {
 	if strings.TrimSpace(c.APIKey) == "" {
 		return "", Usage{}, errors.New("openrouter API key is empty")
@@ -92,6 +93,13 @@ func (c *Client) Chat(ctx context.Context, messages []Message) (string, Usage, e
 	}
 	if len(messages) == 0 {
 		return "", Usage{}, errors.New("no messages to send")
+	}
+
+	if systemPrompt := strings.TrimSpace(c.SystemPrompt); systemPrompt != "" {
+		messages = append([]Message{{
+			Role:    "system",
+			Content: systemPrompt,
+		}}, messages...)
 	}
 
 	request := chatRequest{

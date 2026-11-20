@@ -157,7 +157,8 @@ Context rules:
 - Include messages in chronological order.
 - Bot messages become `assistant` turns.
 - Other messages become `user` turns prefixed with the author's display name.
-- No system prompt is sent.
+- A short system prompt limits replies to a single tweet (280 characters) unless the user asks for more detail.
+- The system prompt can be overridden with `CHAT_SYSTEM_PROMPT`.
 
 Response rules:
 
@@ -174,7 +175,7 @@ Response rules:
 Location: `internal/llm/openrouter.go`
 
 - OpenAI-compatible `POST /chat/completions` at OpenRouter.
-- No system message is added by the client.
+- A system prompt is prepended when configured. The bot uses a default 280-character single-tweet limit.
 - Web search uses the `openrouter:web_search` server tool, not the deprecated `:online` suffix or `web` plugin.
 - The server tool is only added when `OPENROUTER_WEB_SEARCH` is true. The model decides whether a search is needed.
 - Search limits live in `OPENROUTER_WEB_SEARCH_MAX_RESULTS` and `OPENROUTER_WEB_SEARCH_MAX_USES`.
@@ -194,6 +195,7 @@ Configuration uses Viper and dotenv.
 - `OPENROUTER_API_KEY` is environment-only and should never be added as a flag.
 - `.env` is gitignored. Keep `.env.example` current.
 - If the OpenRouter key is empty, mention chat is disabled and `/link` still works.
+- `CHAT_SYSTEM_PROMPT` overrides the built-in 280-character single-tweet prompt.
 - Web search is enabled by default with `OPENROUTER_WEB_SEARCH=true`. It is capped by `OPENROUTER_WEB_SEARCH_MAX_RESULTS` and `OPENROUTER_WEB_SEARCH_MAX_USES` to control cost.
 
 ---

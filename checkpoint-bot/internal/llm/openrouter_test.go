@@ -68,6 +68,34 @@ func TestChatSendsMessagesWithoutSystemPrompt(t *testing.T) {
 	}
 }
 
+func TestChatPrependsSystemPrompt(t *testing.T) {
+	var got chatRequest
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Errorf("cannot decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"short answer"}}]}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		APIKey:       "test-key",
+		Model:        "deepseek/deepseek-v4.1-flash-1017",
+		BaseURL:      server.URL,
+		SystemPrompt: "Keep replies short.",
+		RetryDelay:   time.Millisecond,
+	}
+
+	_, _, err := client.Chat(context.Background(), []Message{{Role: "user", Content: "hello"}})
+	require.NoError(t, err)
+	require.Len(t, got.Messages, 2)
+	require.Equal(t, "system", got.Messages[0].Role)
+	require.Equal(t, "Keep replies short.", got.Messages[0].Content)
+	require.Equal(t, "user", got.Messages[1].Role)
+}
+
 func TestChatAddsWebSearchTool(t *testing.T) {
 	var got chatRequest
 

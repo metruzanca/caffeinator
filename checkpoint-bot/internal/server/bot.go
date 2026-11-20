@@ -13,6 +13,8 @@ import (
 	"github.com/spf13/viper"
 )
 
+const defaultSystemPrompt = "Keep replies to a single tweet at most: 280 characters or fewer. If the user explicitly asks for more detail, a longer explanation, or a list, you may exceed that limit."
+
 // Bot owns the Discord session, slash commands, and mention chat.
 type Bot struct {
 	DiscordClient  *discordgo.Session
@@ -114,6 +116,11 @@ func newChatFromConfig(session *discordgo.Session) *Chat {
 		baseURL = "https://openrouter.ai/api/v1"
 	}
 
+	systemPrompt := strings.TrimSpace(viper.GetString("CHAT_SYSTEM_PROMPT"))
+	if systemPrompt == "" {
+		systemPrompt = defaultSystemPrompt
+	}
+
 	webSearchMaxResults := viper.GetInt("OPENROUTER_WEB_SEARCH_MAX_RESULTS")
 	if webSearchMaxResults < 1 {
 		webSearchMaxResults = 3
@@ -128,6 +135,7 @@ func newChatFromConfig(session *discordgo.Session) *Chat {
 		Model:               model,
 		BaseURL:             baseURL,
 		MaxTokens:           viper.GetInt("CHAT_MAX_TOKENS"),
+		SystemPrompt:        systemPrompt,
 		WebSearch:           viper.GetBool("OPENROUTER_WEB_SEARCH"),
 		WebSearchMaxResults: webSearchMaxResults,
 		WebSearchMaxUses:    webSearchMaxUses,
@@ -146,6 +154,7 @@ func newChatFromConfig(session *discordgo.Session) *Chat {
 
 	log.Info("chat enabled",
 		"model", model,
+		"system_prompt_chars", len([]rune(client.SystemPrompt)),
 		"web_search", client.WebSearch,
 		"web_search_max_results", client.WebSearchMaxResults,
 		"web_search_max_uses", client.WebSearchMaxUses,

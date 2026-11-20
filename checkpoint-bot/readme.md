@@ -56,7 +56,7 @@ Context behavior:
 - A reply uses the replied-to message plus up to 9 messages before it.
 - If the replied-to message is gone or inaccessible, it falls back to the last 10 messages before the mention.
 - Bot messages are sent as `assistant` turns. Everything else is a `user` turn with the author name prefixed.
-- No system prompt is sent.
+- A short system prompt keeps replies to a single tweet, 280 characters or fewer, unless the user explicitly asks for more detail. Override it with `CHAT_SYSTEM_PROMPT`.
 
 Web search:
 
@@ -115,6 +115,7 @@ Copy `.env.example` to `.env` and fill it in, or set the same variables in your 
 | `OPENROUTER_WEB_SEARCH_MAX_RESULTS` | `3` | Maximum results per search |
 | `OPENROUTER_WEB_SEARCH_MAX_USES` | `2` | Maximum searches per chat request |
 | `CHAT_ENABLED` | `true` | Set to `false` to disable mention chat |
+| `CHAT_SYSTEM_PROMPT` | built-in 280-character limit | Override the default system prompt |
 | `CHAT_CONTEXT_MESSAGES` | `10` | Messages to include, including the reply anchor |
 | `CHAT_MAX_TOKENS` | `2048` | Maximum output tokens |
 | `CHAT_MAX_CONTEXT_CHARS` | `20000` | Maximum context size in characters |
