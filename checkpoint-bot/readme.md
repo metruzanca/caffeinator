@@ -105,7 +105,7 @@ Copy `.env.example` to `.env` and fill it in, or set the same variables in your 
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Override for testing |
 | `CHAT_ENABLED` | `true` | Set to `false` to disable mention chat |
 | `CHAT_CONTEXT_MESSAGES` | `10` | Messages to include, including the reply anchor |
-| `CHAT_MAX_TOKENS` | `1024` | Maximum output tokens |
+| `CHAT_MAX_TOKENS` | `2048` | Maximum output tokens |
 | `CHAT_MAX_CONTEXT_CHARS` | `20000` | Maximum context size in characters |
 | `CHAT_MAX_CHARS_PER_MESSAGE` | `4000` | Per-message context limit |
 | `CHAT_MAX_CHUNKS` | `3` | Maximum Discord messages per response |

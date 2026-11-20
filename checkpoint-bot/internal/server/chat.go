@@ -151,11 +151,27 @@ func (c *Chat) respond(m *discordgo.MessageCreate, referenced *discordgo.Message
 	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.Timeout)
 	defer cancel()
 
+	contextChars := 0
+	userMessages := 0
+	assistantMessages := 0
+	for _, message := range messages {
+		contextChars += len([]rune(message.Content))
+		switch message.Role {
+		case "user":
+			userMessages++
+		case "assistant":
+			assistantMessages++
+		}
+	}
+
 	log.Info("chat request",
 		"guild", m.GuildID,
 		"channel", m.ChannelID,
 		"user", m.Author.ID,
 		"messages", len(messages),
+		"user_messages", userMessages,
+		"assistant_messages", assistantMessages,
+		"context_chars", contextChars,
 	)
 
 	started := time.Now()

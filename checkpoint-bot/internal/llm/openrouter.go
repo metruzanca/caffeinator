@@ -50,8 +50,10 @@ type chatRequest struct {
 type chatResponse struct {
 	Choices []struct {
 		Message struct {
-			Content string `json:"content"`
+			Content   string `json:"content"`
+			Reasoning string `json:"reasoning"`
 		} `json:"message"`
+		FinishReason string `json:"finish_reason"`
 	} `json:"choices"`
 	Usage Usage `json:"usage"`
 	Error *struct {
@@ -154,12 +156,26 @@ func (c *Client) do(ctx context.Context, body []byte) (string, Usage, bool, erro
 		return "", parsed.Usage, false, fmt.Errorf("openrouter: %s", parsed.Error.Message)
 	}
 	if len(parsed.Choices) == 0 {
-		return "", parsed.Usage, false, errors.New("openrouter returned no choices")
+		return "", parsed.Usage, true, errors.New("openrouter returned no choices")
 	}
 
-	content := strings.TrimSpace(parsed.Choices[0].Message.Content)
+	choice := parsed.Choices[0]
+	content := strings.TrimSpace(choice.Message.Content)
 	if content == "" {
-		return "", parsed.Usage, false, errors.New("openrouter returned an empty response")
+		finishReason := choice.FinishReason
+		if finishReason == "" {
+			finishReason = "unknown"
+		}
+
+		if reasoning := strings.TrimSpace(choice.Message.Reasoning); reasoning != "" {
+			return "", parsed.Usage, true, fmt.Errorf(
+				"openrouter returned reasoning without content (finish_reason=%s, reasoning_chars=%d)",
+				finishReason,
+				len([]rune(reasoning)),
+			)
+		}
+
+		return "", parsed.Usage, true, fmt.Errorf("openrouter returned an empty response (finish_reason=%s)", finishReason)
 	}
 
 	return content, parsed.Usage, false, nil

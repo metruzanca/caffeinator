@@ -120,6 +120,29 @@ func TestChatRetriesServerError(t *testing.T) {
 }
 
 func TestChatRejectsEmptyResponse(t *testing.T) {
+	var calls atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"","reasoning":"thinking"},"finish_reason":"length"}]}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		APIKey:     "test-key",
+		Model:      "model",
+		BaseURL:    server.URL,
+		RetryDelay: time.Millisecond,
+	}
+
+	_, _, err := client.Chat(context.Background(), []Message{{Role: "user", Content: "hi"}})
+	require.Error(t, err)
+	require.True(t, strings.Contains(err.Error(), "reasoning without content"))
+	require.Equal(t, int32(2), calls.Load())
+}
+
+func TestChatRejectsNoChoices(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"choices":[]}`))
@@ -135,7 +158,33 @@ func TestChatRejectsEmptyResponse(t *testing.T) {
 
 	_, _, err := client.Chat(context.Background(), []Message{{Role: "user", Content: "hi"}})
 	require.Error(t, err)
-	require.True(t, strings.Contains(err.Error(), "no choices"))
+	require.Contains(t, err.Error(), "no choices")
+}
+
+func TestChatRetriesEmptyResponse(t *testing.T) {
+	var calls atomic.Int32
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if calls.Add(1) == 1 {
+			_, _ = w.Write([]byte(`{"choices":[{"message":{"content":""},"finish_reason":"length"}]}`))
+			return
+		}
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"second try"}}]}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		APIKey:     "test-key",
+		Model:      "model",
+		BaseURL:    server.URL,
+		RetryDelay: time.Millisecond,
+	}
+
+	content, _, err := client.Chat(context.Background(), []Message{{Role: "user", Content: "hi"}})
+	require.NoError(t, err)
+	require.Equal(t, "second try", content)
+	require.Equal(t, int32(2), calls.Load())
 }
 
 func TestChatRequiresAPIKey(t *testing.T) {
