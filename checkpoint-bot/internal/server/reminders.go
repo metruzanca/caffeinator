@@ -69,6 +69,10 @@ func (c *ReminderService) HandleMessage(ctx context.Context, m *discordgo.Messag
 		return true
 	}
 
+	if err := c.session.ChannelTyping(m.ChannelID); err != nil {
+		log.Debug("cannot send reminder typing indicator", "err", err, "channel", m.ChannelID)
+	}
+
 	timezone := c.store.Timezone(m.Author.ID)
 	now := time.Now()
 	if timezone != "" {
