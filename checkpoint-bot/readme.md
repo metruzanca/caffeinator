@@ -31,7 +31,7 @@ Checkpoint and goal tracking were removed. If that feature comes back, it will s
 |---|---|
 | `/link url:<url>` | Rewrites X/Twitter links to `fxtwitter.com` and Instagram links to `kkinstagram.com`, and removes tracking query parameters. |
 | `/ask text:<text> [history_length] [disable_memory]` | Runs the same chat pipeline as a mention. `history_length` defaults to 10 and can go up to 100. Set `disable_memory` to skip memory reads and writes for that ask. Responses are public. |
-| `/memory view\|forget\|list` | Admin-only memory management. Responses are ephemeral, so only the invoker sees them. |
+| `/memory view\|forget\|list` | View or forget memory. Everyone can manage their own memory. Admins can target other users or server memory and list users. Responses are ephemeral. |
 
 Examples:
 
@@ -131,15 +131,26 @@ How it works:
 - The bot does not learn from its own replies.
 - `disable_memory` on `/ask` skips both reads and writes for that ask.
 
-Admin memory management:
+Memory commands:
 
 ```text
-/memory view [user]
-/memory forget [user]
+/memory view
+/memory view user:@someone
+/memory view server:true
+/memory forget fact:<text>
+/memory forget all:true
+/memory forget user:@someone fact:<text>
 /memory list
 ```
 
-`/memory` requires Administrator permission and always replies ephemerally. Omit `user` to view or clear server memory.
+Rules:
+
+- `/memory view` with no arguments shows your own memory.
+- `/memory forget fact:<text>` removes entries that contain the text.
+- `/memory forget all:true` clears all memory for you.
+- Admins can target other users with `user:@someone` or server memory with `server:true`.
+- `/memory list` is admin only.
+- Every response is ephemeral, so only the invoker sees it.
 
 ### Memory storage
 

@@ -32,6 +32,7 @@ type ChatService interface {
 // MemoryService is the memory store used by the memory command.
 type MemoryService interface {
 	Get(subjectID string) (string, error)
+	RemoveFacts(subjectID, match string) (int, error)
 	Forget(subjectID string) error
 	ListUsers() ([]string, error)
 }

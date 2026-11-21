@@ -115,6 +115,53 @@ func (s *Store) Get(subjectID string) (string, error) {
 	return string(data), nil
 }
 
+// RemoveFacts deletes memory lines that contain the match text.
+func (s *Store) RemoveFacts(subjectID, match string) (int, error) {
+	if s == nil {
+		return 0, errors.New("memory is disabled")
+	}
+	match = normalize(match)
+	if match == "" {
+		return 0, errors.New("memory match text is empty")
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	path, err := s.subjectPath(subjectID)
+	if err != nil {
+		return 0, err
+	}
+	data, err := os.ReadFile(path)
+	if errors.Is(err, os.ErrNotExist) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, fmt.Errorf("cannot read memory: %w", err)
+	}
+
+	lines := strings.Split(string(data), "\n")
+	kept := make([]string, 0, len(lines))
+	removed := 0
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if strings.HasPrefix(trimmed, "- ") && strings.Contains(normalize(trimmed), match) {
+			removed++
+			continue
+		}
+		kept = append(kept, line)
+	}
+	if removed == 0 {
+		return 0, nil
+	}
+
+	content := strings.TrimRight(strings.Join(kept, "\n"), "\n") + "\n"
+	if err := writeAtomic(path, []byte(content)); err != nil {
+		return 0, err
+	}
+	return removed, nil
+}
+
 // Forget deletes the markdown file for a subject.
 func (s *Store) Forget(subjectID string) error {
 	if s == nil {

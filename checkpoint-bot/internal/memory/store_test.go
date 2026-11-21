@@ -71,6 +71,24 @@ func TestStoreDeduplicatesFacts(t *testing.T) {
 	require.Equal(t, 1, strings.Count(text, "Building a Go Discord bot."))
 }
 
+func TestStoreRemoveFacts(t *testing.T) {
+	store, err := NewStore(t.TempDir(), 1000)
+	require.NoError(t, err)
+	require.NoError(t, store.AppendFacts([]Fact{
+		{SubjectID: "123", SubjectName: "Alice", Text: "Full name is Samuele.", Category: "identity", Confidence: 0.9},
+		{SubjectID: "123", SubjectName: "Alice", Text: "Building a Go Discord bot.", Category: "work", Confidence: 0.9},
+	}))
+
+	removed, err := store.RemoveFacts("123", "Samuele")
+	require.NoError(t, err)
+	require.Equal(t, 1, removed)
+
+	text, err := store.Get("123")
+	require.NoError(t, err)
+	require.NotContains(t, text, "Samuele")
+	require.Contains(t, text, "Building a Go Discord bot.")
+}
+
 func TestStoreForget(t *testing.T) {
 	store, err := NewStore(t.TempDir(), 1000)
 	require.NoError(t, err)

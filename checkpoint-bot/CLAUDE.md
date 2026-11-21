@@ -44,7 +44,7 @@ Features:
 1. `/link` rewrites social media URLs for embed-friendly hosts.
 2. Mention and reply chat sends recent channel context to OpenRouter and posts the response.
 3. `/ask` runs the same chat pipeline with configurable history and memory opt-out.
-4. `/memory` lets admins inspect and clear markdown memory.
+4. `/memory` lets users inspect and remove their own memory. Admins can target other users or server memory.
 
 `cmd/root.go` starts the bot and handles shutdown. `internal/server.NewBot` creates the Discord session and sets the required intents. `Bot.Start` connects, registers the chat handler, installs slash commands, and handles newly joined servers.
 
@@ -218,7 +218,11 @@ Rules:
 - Memory is enabled only for invoked conversations.
 - `disable_memory` on `/ask` skips reads and writes.
 - The bot must never scan normal channel traffic.
-- `/memory` is Administrator-only and replies ephemerally.
+- `/memory view` and `/memory forget` work on the invoker's own memory by default.
+- Admins can target another user with `user:@someone` or server memory with `server:true`.
+- `/memory forget fact:<text>` removes matching entries. `/memory forget all:true` clears the target.
+- `/memory list` is Administrator-only.
+- Every `/memory` response is ephemeral.
 - Without a persistent volume, memory is lost on deploy.
 
 ---
