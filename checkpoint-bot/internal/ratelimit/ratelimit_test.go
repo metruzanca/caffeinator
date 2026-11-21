@@ -33,3 +33,25 @@ func TestLimiterRefills(t *testing.T) {
 
 	require.True(t, limiter.Allow("user"))
 }
+
+func TestLimiterRetryAfter(t *testing.T) {
+	limiter := New(1, time.Hour)
+
+	require.Equal(t, time.Duration(0), limiter.RetryAfter("user"))
+
+	require.True(t, limiter.Allow("user"))
+	wait := limiter.RetryAfter("user")
+	require.Greater(t, wait, time.Duration(0))
+	require.LessOrEqual(t, wait, time.Hour)
+}
+
+func TestLimiterRetryAfterClearsOnRefill(t *testing.T) {
+	limiter := New(1, 20*time.Millisecond)
+
+	require.True(t, limiter.Allow("user"))
+	require.Greater(t, limiter.RetryAfter("user"), time.Duration(0))
+
+	time.Sleep(25 * time.Millisecond)
+
+	require.Equal(t, time.Duration(0), limiter.RetryAfter("user"))
+}

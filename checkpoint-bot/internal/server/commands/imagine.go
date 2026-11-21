@@ -86,7 +86,7 @@ var ImagineCmd = &Command{
 
 		userID := interactionUserID(i)
 		if h.ImageLimiter != nil && !h.ImageLimiter.Allow(userID) {
-			respondEphemeral(s, i, "You're generating images too quickly. Try again later.")
+			respondEphemeral(s, i, "You're generating images too quickly. Try again "+discordRetryTimestamp(h.ImageLimiter.RetryAfter(userID))+".")
 			return
 		}
 
@@ -298,6 +298,17 @@ func imageFiles(images []imagegen.Output) []*discordgo.File {
 	return files
 }
 
+// defaultProviderRetryWait is used when the provider gives no retry hint.
+const defaultProviderRetryWait = 30 * time.Second
+
+// discordRetryTimestamp renders a relative Discord timestamp, e.g. "in 5 minutes".
+func discordRetryTimestamp(wait time.Duration) string {
+	if wait < time.Second {
+		wait = time.Second
+	}
+	return fmt.Sprintf("<t:%d:R>", time.Now().Add(wait).Unix())
+}
+
 func imageGenerationErrorMessage(err error, nsfw bool) string {
 	var blocked *imagegen.ContentBlockedError
 	if errors.As(err, &blocked) {
@@ -312,6 +323,21 @@ func imageGenerationErrorMessage(err error, nsfw bool) string {
 			return "That's a bit too lewd for my liking. This is a Christian server."
 		}
 		return "The image provider blocked that prompt."
+	}
+
+	var rateErr *imagegen.RateLimitError
+	if errors.As(err, &rateErr) {
+		wait := rateErr.RetryAfter
+		if wait <= 0 {
+			wait = defaultProviderRetryWait
+		}
+		message := "The image provider is rate limited. Try again " + discordRetryTimestamp(wait) + "."
+		if nsfw {
+			if reason := strings.TrimSpace(rateErr.Reason); reason != "" {
+				message += "\n> " + reason
+			}
+		}
+		return message
 	}
 
 	var providerErr *imagegen.ProviderError

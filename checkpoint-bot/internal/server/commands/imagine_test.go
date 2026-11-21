@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/metruzanca/checkpoint-bot/internal/imagegen"
@@ -100,6 +101,38 @@ func TestImageGenerationErrorMessage(t *testing.T) {
 	require.Contains(t, imageGenerationErrorMessage(provider, true), "submit returned 422")
 
 	require.Equal(t, "Image generation failed. Try again in a bit.", imageGenerationErrorMessage(errors.New("boom"), false))
+}
+
+func TestImageGenerationRateLimitMessage(t *testing.T) {
+	rateErr := &imagegen.RateLimitError{
+		Reason:     "You have too many active tasks.",
+		StatusCode: http.StatusTooManyRequests,
+		RetryAfter: 45 * time.Second,
+	}
+
+	message := imageGenerationErrorMessage(rateErr, false)
+	require.Contains(t, message, "rate limited")
+	require.Contains(t, message, "<t:")
+	require.NotContains(t, message, "too many active tasks")
+
+	nsfwMessage := imageGenerationErrorMessage(rateErr, true)
+	require.Contains(t, nsfwMessage, "rate limited")
+	require.Contains(t, nsfwMessage, "<t:")
+	require.Contains(t, nsfwMessage, "too many active tasks")
+}
+
+func TestImageGenerationRateLimitMessageWithoutHint(t *testing.T) {
+	rateErr := &imagegen.RateLimitError{
+		Reason:     "You have too many active tasks.",
+		StatusCode: http.StatusTooManyRequests,
+	}
+
+	require.Contains(t, imageGenerationErrorMessage(rateErr, false), "<t:")
+}
+
+func TestDiscordRetryTimestamp(t *testing.T) {
+	timestamp := discordRetryTimestamp(0)
+	require.Regexp(t, `^<t:\d+:R>$`, timestamp)
 }
 
 func TestResolveImageSafetyTolerance(t *testing.T) {

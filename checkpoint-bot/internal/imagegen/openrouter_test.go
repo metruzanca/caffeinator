@@ -216,6 +216,74 @@ func TestGenerateNonModerationError(t *testing.T) {
 	require.False(t, errors.As(err, &blocked))
 }
 
+func TestGenerateRateLimitFromStatus(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Retry-After", "45")
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"message":"Black Forest Labs submit returned 429: You have too many active tasks."}}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		APIKey:     "test-key",
+		Model:      "black-forest-labs/flux.2-klein-4b",
+		BaseURL:    server.URL,
+		HTTPClient: server.Client(),
+	}
+
+	_, err := client.Generate(context.Background(), Request{Prompt: "hello"})
+	require.Error(t, err)
+
+	var rateErr *RateLimitError
+	require.True(t, errors.As(err, &rateErr))
+	require.Equal(t, http.StatusTooManyRequests, rateErr.StatusCode)
+	require.InDelta(t, 45, rateErr.RetryAfter.Seconds(), 1)
+}
+
+func TestGenerateRateLimitParsesMessageDuration(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusTooManyRequests)
+		_, _ = w.Write([]byte(`{"error":{"message":"Too many requests. Please try again in 2 minutes."}}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		APIKey:     "test-key",
+		Model:      "black-forest-labs/flux.2-klein-4b",
+		BaseURL:    server.URL,
+		HTTPClient: server.Client(),
+	}
+
+	_, err := client.Generate(context.Background(), Request{Prompt: "hello"})
+	require.Error(t, err)
+
+	var rateErr *RateLimitError
+	require.True(t, errors.As(err, &rateErr))
+	require.InDelta(t, (2 * time.Minute).Seconds(), rateErr.RetryAfter.Seconds(), 1)
+}
+
+func TestGenerateRateLimitWithoutHint(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		_, _ = w.Write([]byte(`{"error":{"message":"Black Forest Labs submit returned 429: You have too many active tasks."}}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		APIKey:     "test-key",
+		Model:      "black-forest-labs/flux.2-klein-4b",
+		BaseURL:    server.URL,
+		HTTPClient: server.Client(),
+	}
+
+	_, err := client.Generate(context.Background(), Request{Prompt: "hello"})
+	require.Error(t, err)
+
+	var rateErr *RateLimitError
+	require.True(t, errors.As(err, &rateErr))
+	require.Zero(t, rateErr.RetryAfter)
+}
+
 func TestGenerateRequiresPrompt(t *testing.T) {
 	client := &Client{APIKey: "test-key", Model: "model"}
 	_, err := client.Generate(context.Background(), Request{Prompt: "  "})

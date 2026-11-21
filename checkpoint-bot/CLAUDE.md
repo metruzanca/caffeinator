@@ -261,6 +261,9 @@ Location: `internal/imagegen/` and `internal/server/commands/imagine.go`
 - Detect `imagegen.ContentBlockedError` and return a moderation-specific message.
 - In normal channels, use a cheeky non-explicit message and do not redirect to NSFW channels.
 - In NSFW channels, include the provider moderation reason.
+- Detect `imagegen.RateLimitError`. Read `Retry-After` first, then a duration in the provider message, then guess 30 seconds.
+- Show local and provider rate limits with a Discord relative timestamp, for example `<t:1234567890:R>`.
+- `ratelimit.Limiter.RetryAfter` reports when the next token is available. Use it for the per-user limit.
 - Keep unrelated failures on the generic error message.
 
 ---

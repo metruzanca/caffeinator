@@ -79,3 +79,30 @@ func (l *Limiter) Allow(key string) bool {
 
 	return false
 }
+
+// RetryAfter reports how long until key may make another request.
+// It returns zero when the key can request now.
+func (l *Limiter) RetryAfter(key string) time.Duration {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+
+	b, exists := l.buckets[key]
+	if !exists {
+		return 0
+	}
+
+	elapsed := time.Since(b.lastRefill)
+	tokens := b.tokens
+	if elapsed >= l.refill {
+		tokens = min(l.capacity, tokens+int(elapsed/l.refill))
+	}
+	if tokens > 0 {
+		return 0
+	}
+
+	wait := l.refill - elapsed%l.refill
+	if wait <= 0 || wait > l.refill {
+		wait = l.refill
+	}
+	return wait
+}

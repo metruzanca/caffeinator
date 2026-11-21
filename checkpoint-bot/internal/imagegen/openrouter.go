@@ -10,7 +10,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
+	"strconv"
 	"strings"
+	"time"
 )
 
 const (
@@ -58,6 +61,21 @@ type ProviderError struct {
 func (e *ProviderError) Error() string {
 	if strings.TrimSpace(e.Reason) == "" {
 		return fmt.Sprintf("image provider returned status %d", e.StatusCode)
+	}
+	return fmt.Sprintf("openrouter image: %s (status %d)", e.Reason, e.StatusCode)
+}
+
+// RateLimitError describes a provider throttle or busy response.
+type RateLimitError struct {
+	Reason     string
+	StatusCode int
+	// RetryAfter is zero when the provider gave no hint.
+	RetryAfter time.Duration
+}
+
+func (e *RateLimitError) Error() string {
+	if strings.TrimSpace(e.Reason) == "" {
+		return fmt.Sprintf("image provider rate limited (status %d)", e.StatusCode)
 	}
 	return fmt.Sprintf("openrouter image: %s (status %d)", e.Reason, e.StatusCode)
 }
@@ -228,6 +246,14 @@ func (c *Client) Generate(ctx context.Context, req Request) (Result, error) {
 			}
 		}
 
+		if resp.StatusCode == http.StatusTooManyRequests || isRateLimitMessage(message) {
+			return Result{}, &RateLimitError{
+				Reason:     message,
+				StatusCode: resp.StatusCode,
+				RetryAfter: parseRetryAfter(resp.Header, message),
+			}
+		}
+
 		return Result{}, &ProviderError{
 			Reason:     message,
 			StatusCode: resp.StatusCode,
@@ -284,6 +310,77 @@ func (c *Client) httpClient() *http.Client {
 		return c.HTTPClient
 	}
 	return http.DefaultClient
+}
+
+func isRateLimitMessage(message string) bool {
+	message = strings.ToLower(message)
+	phrases := []string{
+		"too many active tasks",
+		"too many requests",
+		"rate limit",
+		"rate-limit",
+		"ratelimit",
+		"too quickly",
+		"please wait for some to complete",
+	}
+	for _, phrase := range phrases {
+		if strings.Contains(message, phrase) {
+			return true
+		}
+	}
+	return false
+}
+
+var retryDurationPattern = regexp.MustCompile(`(?i)(\d+(?:\.\d+)?)\s*(hours?|hrs?|h|minutes?|mins?|m|seconds?|secs?|s)\b`)
+
+// parseRetryAfter reads provider headers first, then falls back to the message.
+// It returns zero when no hint is available.
+func parseRetryAfter(header http.Header, message string) time.Duration {
+	for _, name := range []string{"Retry-After", "X-RateLimit-Reset-After"} {
+		raw := strings.TrimSpace(header.Get(name))
+		if raw == "" {
+			continue
+		}
+		if seconds, err := strconv.ParseFloat(raw, 64); err == nil && seconds >= 0 {
+			return time.Duration(seconds * float64(time.Second))
+		}
+		if when, err := http.ParseTime(raw); err == nil {
+			if wait := time.Until(when); wait > 0 {
+				return wait
+			}
+		}
+	}
+
+	if raw := strings.TrimSpace(header.Get("X-RateLimit-Reset")); raw != "" {
+		if epoch, err := strconv.ParseInt(raw, 10, 64); err == nil {
+			if wait := time.Until(time.Unix(epoch, 0)); wait > 0 {
+				return wait
+			}
+		}
+	}
+
+	return parseMessageDuration(message)
+}
+
+func parseMessageDuration(message string) time.Duration {
+	match := retryDurationPattern.FindStringSubmatch(message)
+	if len(match) != 3 {
+		return 0
+	}
+	value, err := strconv.ParseFloat(match[1], 64)
+	if err != nil || value < 0 {
+		return 0
+	}
+
+	unit := strings.ToLower(match[2])
+	multiplier := time.Second
+	switch {
+	case strings.HasPrefix(unit, "h"):
+		multiplier = time.Hour
+	case strings.HasPrefix(unit, "m"):
+		multiplier = time.Minute
+	}
+	return time.Duration(value * float64(multiplier))
 }
 
 func isModerationMessage(message string) bool {

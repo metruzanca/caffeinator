@@ -85,6 +85,8 @@ If the provider blocks a prompt:
 - Normal channels get a cheeky, non-explicit response. The bot does not redirect people to NSFW channels.
 - NSFW channels get the provider’s moderation reason.
 
+If generation is rate limited, the bot replies with a Discord relative timestamp such as "Try again <t:...:R>". This covers both the per-user limit and provider throttling. When the provider reports how long to wait, the bot uses that value. Messages such as "too many active tasks" have no hint, so the bot suggests 30 seconds.
+
 ---
 
 ## Reminders and events
