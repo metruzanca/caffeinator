@@ -1,6 +1,6 @@
 package main
 
-import "github.com/metruzanca/checkpoint-bot/cmd"
+import "github.com/metruzanca/caffeinator/cmd"
 
 func main() {
 	cmd.Execute()

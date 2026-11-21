@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/metruzanca/checkpoint-bot/internal/llm"
+	"github.com/metruzanca/caffeinator/internal/llm"
 )
 
 // ParserSystemPrompt is the system prompt for reminder intent parsing.

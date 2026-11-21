@@ -9,8 +9,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/charmbracelet/log"
-	"github.com/metruzanca/checkpoint-bot/internal/ratelimit"
-	"github.com/metruzanca/checkpoint-bot/internal/reminders"
+	"github.com/metruzanca/caffeinator/internal/ratelimit"
+	"github.com/metruzanca/caffeinator/internal/reminders"
 )
 
 var (

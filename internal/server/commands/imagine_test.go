@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/metruzanca/checkpoint-bot/internal/imagegen"
+	"github.com/metruzanca/caffeinator/internal/imagegen"
 	"github.com/stretchr/testify/require"
 )
 

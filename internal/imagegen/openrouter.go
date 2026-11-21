@@ -210,7 +210,7 @@ func (c *Client) Generate(ctx context.Context, req Request) (Result, error) {
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+c.APIKey)
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("HTTP-Referer", "https://github.com/metruzanca/checkpoint-bot")
+	httpReq.Header.Set("HTTP-Referer", "https://github.com/metruzanca/caffeinator")
 	httpReq.Header.Set("X-Title", "Caffeinator")
 
 	resp, err := c.httpClient().Do(httpReq)

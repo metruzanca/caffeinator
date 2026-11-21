@@ -249,7 +249,7 @@ func (c *Client) do(ctx context.Context, body []byte) (string, Usage, bool, erro
 	}
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("HTTP-Referer", "https://github.com/metruzanca/checkpoint-bot")
+	req.Header.Set("HTTP-Referer", "https://github.com/metruzanca/caffeinator")
 	req.Header.Set("X-Title", "Caffeinator")
 
 	resp, err := c.httpClient().Do(req)

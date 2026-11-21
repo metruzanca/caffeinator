@@ -6,15 +6,15 @@ import (
 	"syscall"
 
 	"github.com/charmbracelet/log"
-	"github.com/metruzanca/checkpoint-bot/internal/config"
-	"github.com/metruzanca/checkpoint-bot/internal/server"
+	"github.com/metruzanca/caffeinator/internal/config"
+	"github.com/metruzanca/caffeinator/internal/server"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
 
 var rootCmd = &cobra.Command{
-	Use:               "checkpoint",
-	Short:             "Caffeinator, a Discord bot for The Coffee Break",
+	Use:               "caffeinator",
+	Short:             "Caffeinator, a self-hostable Discord bot",
 	PersistentPreRunE: config.PersistentPreRunE,
 	Run: func(cmd *cobra.Command, args []string) {
 		token := viper.GetString("TOKEN")

@@ -1,9 +1,7 @@
 # Error logs
 tmp
 # Binary
-checkpoint-bot
-# Legacy checkpoint database
-db
+caffeinator
 # Local bot memory
 /memory/
 # Local reminders

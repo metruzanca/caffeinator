@@ -10,7 +10,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/charmbracelet/log"
-	"github.com/metruzanca/checkpoint-bot/internal/memory"
+	"github.com/metruzanca/caffeinator/internal/memory"
 )
 
 type passiveCollectorConfig struct {

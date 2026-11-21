@@ -7,6 +7,6 @@ RUN go mod download && go mod verify
 
 COPY . .
 
-RUN go build -o main .
+RUN go build -o caffeinator .
 
-CMD ["./main"]
+CMD ["./caffeinator"]

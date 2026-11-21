@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/metruzanca/checkpoint-bot/internal/reminders"
+	"github.com/metruzanca/caffeinator/internal/reminders"
 	"github.com/stretchr/testify/require"
 )
 

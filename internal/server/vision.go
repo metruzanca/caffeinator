@@ -7,7 +7,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/charmbracelet/log"
-	"github.com/metruzanca/checkpoint-bot/internal/llm"
+	"github.com/metruzanca/caffeinator/internal/llm"
 )
 
 func (c *Chat) visionParts(current *discordgo.MessageCreate, referenced *discordgo.Message) []llm.ContentPart {

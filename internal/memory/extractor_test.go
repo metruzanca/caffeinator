@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/metruzanca/checkpoint-bot/internal/llm"
+	"github.com/metruzanca/caffeinator/internal/llm"
 	"github.com/stretchr/testify/require"
 )
 

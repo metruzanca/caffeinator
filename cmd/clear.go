@@ -2,7 +2,7 @@ package cmd
 
 import (
 	"github.com/charmbracelet/log"
-	"github.com/metruzanca/checkpoint-bot/internal/server"
+	"github.com/metruzanca/caffeinator/internal/server"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

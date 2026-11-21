@@ -13,7 +13,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/charmbracelet/log"
-	"github.com/metruzanca/checkpoint-bot/internal/imagegen"
+	"github.com/metruzanca/caffeinator/internal/imagegen"
 )
 
 // ImagineCmd generates images with OpenRouter.

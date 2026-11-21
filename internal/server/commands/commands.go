@@ -6,8 +6,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/charmbracelet/log"
-	"github.com/metruzanca/checkpoint-bot/internal/imagegen"
-	"github.com/metruzanca/checkpoint-bot/internal/ratelimit"
+	"github.com/metruzanca/caffeinator/internal/imagegen"
+	"github.com/metruzanca/caffeinator/internal/ratelimit"
 )
 
 // Global mutable map, only modified in init() functions.

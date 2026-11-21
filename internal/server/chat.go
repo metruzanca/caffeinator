@@ -10,10 +10,10 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/charmbracelet/log"
-	"github.com/metruzanca/checkpoint-bot/internal/llm"
-	"github.com/metruzanca/checkpoint-bot/internal/memory"
-	"github.com/metruzanca/checkpoint-bot/internal/ratelimit"
-	"github.com/metruzanca/checkpoint-bot/internal/server/commands"
+	"github.com/metruzanca/caffeinator/internal/llm"
+	"github.com/metruzanca/caffeinator/internal/memory"
+	"github.com/metruzanca/caffeinator/internal/ratelimit"
+	"github.com/metruzanca/caffeinator/internal/server/commands"
 )
 
 const (

@@ -1,4 +1,4 @@
-module github.com/metruzanca/checkpoint-bot
+module github.com/metruzanca/caffeinator
 
 go 1.25.0
 

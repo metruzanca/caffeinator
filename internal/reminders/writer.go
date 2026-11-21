@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/metruzanca/checkpoint-bot/internal/llm"
+	"github.com/metruzanca/caffeinator/internal/llm"
 )
 
 // WriterSystemPrompt is the system prompt for reminder message text.

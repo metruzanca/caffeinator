@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/metruzanca/checkpoint-bot/internal/llm"
+	"github.com/metruzanca/caffeinator/internal/llm"
 )
 
 // ExtractionSystemPrompt is the system prompt used to extract durable facts.

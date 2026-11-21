@@ -5,8 +5,8 @@ import (
 
 	"github.com/charmbracelet/log"
 
-	"github.com/metruzanca/checkpoint-bot/internal/config"
-	"github.com/metruzanca/checkpoint-bot/internal/util"
+	"github.com/metruzanca/caffeinator/internal/config"
+	"github.com/metruzanca/caffeinator/internal/util"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )

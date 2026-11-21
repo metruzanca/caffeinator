@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/metruzanca/checkpoint-bot/internal/memory"
+	"github.com/metruzanca/caffeinator/internal/memory"
 	"github.com/stretchr/testify/require"
 )
 
