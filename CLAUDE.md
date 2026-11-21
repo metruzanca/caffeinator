@@ -27,6 +27,7 @@
 - Rate limiter: `internal/ratelimit/ratelimit.go`
 - Configuration: `internal/config/config.go` and `cmd/root.go`
 - CLI: `cmd/*.go`
+- Docs: `README.md` and `docs/`. Keep the README short and put details in `docs/`.
 
 **Build and test**
 

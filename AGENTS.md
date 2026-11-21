@@ -11,3 +11,4 @@
 
 - Caffeinator: a self-hostable Discord bot powered by an LLM with memory and web search. The repository root is the Go module.
 - Keep the project generic. Do not hardcode The Coffee Break in code. Use `BOT_NAME` and `COMMUNITY_NAME` for branding.
+- Keep the README short. Put feature details in `docs/` and link them from the README.
