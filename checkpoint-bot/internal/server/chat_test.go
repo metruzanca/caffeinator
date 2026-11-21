@@ -156,6 +156,81 @@ func TestBuildMessagesDropsOldestContext(t *testing.T) {
 	require.LessOrEqual(t, total, 60)
 }
 
+func TestBuildMessagesIncludesTimestamps(t *testing.T) {
+	history := []*discordgo.Message{
+		{
+			ID:        "1",
+			Author:    &discordgo.User{ID: "alice", Username: "alice"},
+			Content:   "hello",
+			Timestamp: time.Date(2026, 11, 21, 2, 24, 48, 0, time.UTC),
+		},
+		{
+			ID:        "2",
+			Author:    &discordgo.User{ID: "bot", Username: "bot"},
+			Content:   "hi",
+			Timestamp: time.Date(2026, 11, 21, 2, 24, 52, 0, time.UTC),
+		},
+	}
+	current := testMessage("3", "channel", "guild", "bob", "<@bot> what now")
+	current.Timestamp = time.Date(2026, 11, 21, 2, 25, 0, 0, time.UTC)
+
+	messages := buildMessages(history, current, "what now", "bot", ChatConfig{
+		MaxCharsPerMessage: 200,
+		MaxContextChars:    1000,
+	})
+
+	require.Len(t, messages, 3)
+	require.Contains(t, messages[0].Content, "alice [2026-11-21T02:24:48Z]: hello")
+	require.Equal(t, "[2026-11-21T02:24:52Z]: hi", messages[1].Content)
+	require.Contains(t, messages[2].Content, "bob [2026-11-21T02:25:00Z]: what now")
+}
+
+func TestAskAddsContextInstructionWhenHistoryExists(t *testing.T) {
+	session := &fakeChatSession{
+		history: []*discordgo.Message{
+			{ID: "1", Author: &discordgo.User{ID: "carol", Username: "carol"}, Content: "old context"},
+		},
+	}
+	client := &fakeChatClient{response: "answer"}
+	chat := newChat(session, client, ChatConfig{
+		ContextMessages: 10,
+		SystemPrompt:    "base prompt",
+	})
+
+	_, err := chat.Ask(context.Background(), commands.ChatRequest{
+		GuildID:       "guild",
+		ChannelID:     "channel",
+		UserID:        "123",
+		DisplayName:   "Alice",
+		BotID:         "bot",
+		Text:          "what now?",
+		HistoryLength: 10,
+	})
+	require.NoError(t, err)
+	require.Contains(t, client.systemPrompt, "context only")
+}
+
+func TestAskSkipsContextInstructionWithoutHistory(t *testing.T) {
+	session := &fakeChatSession{}
+	client := &fakeChatClient{response: "answer"}
+	chat := newChat(session, client, ChatConfig{
+		ContextMessages: 10,
+		SystemPrompt:    "base prompt",
+	})
+
+	_, err := chat.Ask(context.Background(), commands.ChatRequest{
+		GuildID:       "guild",
+		ChannelID:     "channel",
+		UserID:        "123",
+		DisplayName:   "Alice",
+		BotID:         "bot",
+		Text:          "what now?",
+		HistoryLength: 10,
+	})
+	require.NoError(t, err)
+	require.NotContains(t, client.systemPrompt, "context only")
+}
+
 func TestGatherContextWithoutReply(t *testing.T) {
 	session := &fakeChatSession{
 		history: []*discordgo.Message{

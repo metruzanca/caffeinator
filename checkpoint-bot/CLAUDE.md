@@ -178,6 +178,8 @@ Context rules:
 - Bot messages become `assistant` turns.
 - Other messages become `user` turns prefixed with the author's display name.
 - Images from the current message and the replied-to message are attached as image content parts. Older context images are not sent.
+- Context messages include UTC RFC3339 timestamps.
+- Earlier messages are marked as reference only. The final user message is the request, and older context may be unrelated.
 - A system prompt tells the bot its stack: Go, discordgo, Railway, OpenRouter, and DeepSeek V4.1 Flash 1017.
 - It also tells the bot that memory is automatic, tool-free, does not require a mention, and covers facts people share about themselves plus admin-taught server facts. It must not claim it cannot remember between sessions, and it must not claim a write it cannot store.
 - It requires inline Discord markdown citations for web search results, using short relevant phrases as link text and at most two citations by default.
