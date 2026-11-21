@@ -4,7 +4,6 @@
 
 ```text
 .
-├── cmd/                       # CLI commands (run, invite, command clear)
 ├── docs/                      # Feature and configuration docs
 ├── internal/
 │   ├── config/                # Viper, dotenv, branding, logging

@@ -1,6 +1,6 @@
 # Configuration
 
-Configuration uses Viper and dotenv. Environment variables override defaults. Set values in `.env` or in your hosting platform.
+Configuration uses Viper and dotenv. It is environment-only: there are no command-line flags. Environment variables override defaults. Set values in `.env` or in your hosting platform.
 
 ## Branding
 
@@ -43,7 +43,6 @@ The Discord username, avatar, and description are set in the [Discord Developer 
 | `TOKEN` | required | Discord bot token |
 | `BOT_NAME` | `Caffeinator` | Name the bot uses when it refers to itself |
 | `COMMUNITY_NAME` | `The Coffee Break` | Community name used in the default system prompt |
-| `CLIENT_ID` | empty | Discord application client ID, used by `caffeinator invite` |
 | `CHANNEL_ID` | empty | Optional channel for startup notifications |
 | `STARTUP_MESSAGE` | `true` | Print startup info and send the restart notice |
 | `LOG_FORMAT` | `text` | `text` or `json`. Automatically `json` when `RAILWAY_ENVIRONMENT` is set |

@@ -371,24 +371,6 @@ func (b *Bot) onGuildJoined(s *discordgo.Session, g *discordgo.GuildCreate) {
 	b.CommandHandler.RegisterCommandsForGuild(g.ID)
 }
 
-// UnregisterCommands removes every slash command from every guild.
-func (b *Bot) UnregisterCommands() {
-	for _, guild := range b.DiscordClient.State.Guilds {
-		registeredCommands, err := b.DiscordClient.ApplicationCommands(b.DiscordClient.State.User.ID, guild.ID)
-		if err != nil {
-			log.Error("failed to get registered commands", "guild", guild.ID, "err", err)
-			continue
-		}
-		for _, cmd := range registeredCommands {
-			if err := b.DiscordClient.ApplicationCommandDelete(b.DiscordClient.State.User.ID, guild.ID, cmd.ID); err != nil {
-				log.Error("failed to delete command", "command", cmd.Name, "guild", guild.ID, "err", err)
-			}
-		}
-	}
-
-	log.Info("commands unregistered")
-}
-
 // Stop closes the Discord session.
 func (b *Bot) Stop() {
 	if b.reminderScheduler != nil {

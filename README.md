@@ -60,7 +60,6 @@ Railway is the recommended way to run Caffeinator. It builds the repo and keeps 
 
 ```text
 TOKEN=your-discord-bot-token
-CLIENT_ID=your-discord-client-id
 OPENROUTER_API_KEY=your-openrouter-key
 MEMORY_DIR=/data/memory
 REMINDERS_PATH=/data/reminders.json
@@ -68,9 +67,9 @@ REMINDERS_PATH=/data/reminders.json
 
 7. Deploy. Railway detects Go from `go.mod` at the repository root.
 
-`TOKEN`, `CLIENT_ID`, and `OPENROUTER_API_KEY` are required. The bot exits at startup if the Discord token or OpenRouter key is missing.
+`TOKEN` and `OPENROUTER_API_KEY` are required. The bot exits at startup if either is missing.
 
-The bot prints an invite link on startup when `STARTUP_MESSAGE=true`. You can also run `caffeinator invite` locally.
+The bot prints an invite link on startup when `STARTUP_MESSAGE=true`.
 
 Required Discord permissions: View Channels, Send Messages, Send Messages in Threads, Read Message History, Attach Files, and Add Reactions. The invite link includes the `bot` and `applications.commands` scopes.
 

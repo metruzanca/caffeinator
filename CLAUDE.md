@@ -27,8 +27,7 @@
 - OpenRouter chat client: `internal/llm/openrouter.go`
 - OpenRouter image client: `internal/imagegen/openrouter.go`
 - Rate limiter: `internal/ratelimit/ratelimit.go`
-- Configuration: `internal/config/config.go` and `cmd/root.go`
-- CLI: `cmd/*.go`
+- Configuration: `internal/config/config.go` and `internal/config/defaults.go`
 - Docs: `README.md` and `docs/`. Keep the README short and put details in `docs/`.
 
 **Build and test**
@@ -53,7 +52,7 @@ Features:
 4. `/imagine` generates images through OpenRouter, with an optional reference image.
 5. Reminders and events are created from natural language, stored as JSON, and fired by a scheduler.
 
-`cmd/root.go` starts the bot and handles shutdown. `internal/server.NewBot` creates the Discord session and sets the required intents. `Bot.Start` connects, registers the chat handler, installs slash commands, and handles newly joined servers.
+`main.go` starts the bot and handles shutdown. `internal/server.NewBot` creates the Discord session and sets the required intents. `Bot.Start` connects, registers the chat handler, installs slash commands, and handles newly joined servers.
 
 ---
 
@@ -319,14 +318,13 @@ Location: `internal/llm/openrouter.go`
 
 ## Configuration
 
-Configuration uses Viper and dotenv.
+Configuration uses Viper and dotenv. It is environment-only, with no command-line flags.
 
-- Defaults and CLI flags live in `cmd/root.go`.
+- Defaults live in `internal/config/defaults.go`.
 - Environment variables override defaults.
 - `BOT_NAME` and `COMMUNITY_NAME` control branding. Defaults are `Caffeinator` and `The Coffee Break`. `internal/config/branding.go` provides the helpers.
 - The Discord username and avatar are set in the Discord Developer Portal, not by env vars.
 - `OPENROUTER_APP_URL` sets the referer sent to OpenRouter for attribution.
-- `OPENROUTER_API_KEY` is environment-only and should never be added as a flag.
 - `.env` is gitignored. Keep `.env.example` current.
 - `OPENROUTER_API_KEY` is required. The bot exits at startup when it is missing.
 - `CHAT_SYSTEM_PROMPT` overrides the built-in peer-tone prompt.
