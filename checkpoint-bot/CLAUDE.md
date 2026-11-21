@@ -172,6 +172,7 @@ Context rules:
 - Include messages in chronological order.
 - Bot messages become `assistant` turns.
 - Other messages become `user` turns prefixed with the author's display name.
+- Images from the current message and the replied-to message are attached as image content parts. Older context images are not sent.
 - A system prompt tells the bot its stack: Go, discordgo, Railway, OpenRouter, and DeepSeek V4.1 Flash 1017.
 - It also tells the bot that memory is automatic, tool-free, does not require a mention, and is limited to facts people share about themselves. It must not claim it cannot remember between sessions.
 - It requires inline Discord markdown citations for web search results, using short relevant phrases as link text and at most two citations by default.
@@ -189,6 +190,23 @@ Response rules:
 - Split responses over Discord's 2000-character limit, up to `CHAT_MAX_CHUNKS`.
 - Use a typing indicator while waiting.
 - Rate limit per user and cap concurrent requests.
+
+---
+
+## Vision
+
+Location: `internal/server/vision.go`
+
+- Attach images from the current message and the replied-to message.
+- Do not attach images from older context messages.
+- Accept PNG, JPEG, WebP, and GIF only.
+- Enforce `VISION_MAX_IMAGES` and `VISION_MAX_IMAGE_MB`.
+- Only accept Discord CDN attachment URLs.
+- Send a short text label before each image.
+- Use either the original URL or the Discord proxy URL.
+- Do not use images for passive memory extraction.
+
+The OpenRouter message format uses a content array with a text part first and `image_url` parts after it. Text-only messages must stay JSON strings.
 
 ---
 
@@ -269,6 +287,7 @@ Configuration uses Viper and dotenv.
 - `MEMORY_DIR` defaults to `./memory`. On Railway, use a volume and set `MEMORY_DIR=/data/memory`.
 - `MEMORY_MAX_CONTEXT_CHARS`, `MEMORY_MIN_CONFIDENCE`, and `MEMORY_EXTRACT_TIMEOUT_SECONDS` control memory size and extraction.
 - `MEMORY_PASSIVE_ENABLED`, `MEMORY_BATCH_SECONDS`, `MEMORY_MAX_BATCH_MESSAGES`, and `MEMORY_IGNORE_CHANNELS` control passive learning.
+- `VISION_ENABLED`, `VISION_MAX_IMAGES`, `VISION_MAX_IMAGE_MB`, and `VISION_DETAIL` control image understanding.
 
 ---
 

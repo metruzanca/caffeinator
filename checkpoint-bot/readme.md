@@ -78,6 +78,15 @@ Discord formatting:
 - The bot includes the current Unix time in each request so timestamps stay accurate.
 - User mentions are allowed and can ping. `@everyone`, `@here`, and role mentions are blocked.
 
+Images:
+
+- Attach an image to a mention or reply and the bot can see it.
+- Images on the replied-to message are also included.
+- Supported types: PNG, JPEG, WebP, and GIF.
+- Default limits: 4 images per request and 8 MB per image.
+- Only the current and replied-to message images are sent, not the whole channel history.
+- Image understanding is enabled with `VISION_ENABLED=true`.
+
 Other behavior:
 
 - Other bots and the bot's own messages are ignored.
@@ -237,6 +246,10 @@ Copy `.env.example` to `.env` and fill it in, or set the same variables in your 
 | `MEMORY_BATCH_SECONDS` | `60` | Batch window for passive learning |
 | `MEMORY_MAX_BATCH_MESSAGES` | `20` | Maximum messages per user batch |
 | `MEMORY_IGNORE_CHANNELS` | empty | Comma-separated channel IDs to skip for passive learning |
+| `VISION_ENABLED` | `true` | Enable image understanding for attachments |
+| `VISION_MAX_IMAGES` | `4` | Maximum images per chat request |
+| `VISION_MAX_IMAGE_MB` | `8` | Maximum image size in MB |
+| `VISION_DETAIL` | `auto` | Image detail: `auto`, `low`, `high`, or `original` |
 
 If `OPENROUTER_API_KEY` is empty, the bot still runs and `/link` works. Mention chat is disabled with a startup warning.
 
