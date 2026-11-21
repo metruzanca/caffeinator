@@ -10,8 +10,6 @@
 
 </div>
 
----
-
 ## Why
 
 Caffeinator started as a fact checker for my Discord server. If a conversation made me doubt something, I could mention the bot and ask "is this true?", "what is OOP?", or "what is the latest CVE for PHP?".
