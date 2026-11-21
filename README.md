@@ -11,14 +11,7 @@
 
 ## Overview
 
-This monorepo contains the tooling and infrastructure for "The Coffee Break;" Discord server—an accountability group for developers.
-
-## Projects
-
-| Directory | Description |
-|-----------|-------------|
-| [`checkpoint-bot/`](./checkpoint-bot/) | Discord bot for link fixing and mention chat (Go) |
-| [`server-config/`](./server-config/) | Terraform configuration for Discord server structure |
+This monorepo contains the tooling for "The Coffee Break" Discord server, an accountability group for developers.
 
 ## Quick Start
 
@@ -28,17 +21,6 @@ This monorepo contains the tooling and infrastructure for "The Coffee Break;" Di
 - Discord bot token from [Discord Developer Portal](https://discord.com/developers/applications)
 
 ### Setup
-
-```bash
-# Install tools
-mise install
-
-# See individual project READMEs for specific setup
-```
-
-## Projects
-
-### Caffeinator (Checkpoint Bot)
 
 A lightweight Discord bot for The Coffee Break. Fixes X/Twitter and Instagram links for better embeds, chats when mentioned through OpenRouter, and slowly learns durable facts from conversations it is invoked in.
 
@@ -50,18 +32,6 @@ go build -o checkpoint-bot .
 ```
 
 See [checkpoint-bot/readme.md](./checkpoint-bot/readme.md) for full documentation.
-
-### Server Config
-
-Terraform configuration for managing the Discord server structure (channels, roles, categories).
-
-```bash
-cd server-config
-terraform init
-terraform plan
-```
-
-Uses Railway S3-compatible storage for state backend.
 
 ---
 
