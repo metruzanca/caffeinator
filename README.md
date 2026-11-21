@@ -22,7 +22,7 @@ This monorepo contains the tooling for "The Coffee Break" Discord server, an acc
 
 ### Setup
 
-A lightweight Discord bot for The Coffee Break. Fixes X/Twitter and Instagram links for better embeds, chats when mentioned through OpenRouter, and slowly learns durable facts from conversations it is invoked in.
+A lightweight Discord bot for The Coffee Break. Fixes X/Twitter and Instagram links for better embeds, chats when mentioned through OpenRouter, and slowly learns durable facts from normal messages and conversations.
 
 ```bash
 cd checkpoint-bot

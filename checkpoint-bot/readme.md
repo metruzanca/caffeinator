@@ -100,13 +100,14 @@ Example:
 
 ## Memory
 
-The bot slowly learns durable facts from conversations it is invoked in. It never reads normal channel traffic.
+The bot slowly learns durable facts from normal messages and from conversations where it is invoked.
 
 It learns from:
 
-- Mentions.
-- Replies to the bot.
+- Normal guild messages, automatically.
+- Mentions and replies to the bot.
 - `/ask`, unless `disable_memory` is set.
+- It ignores bots, DMs, and channels listed in `MEMORY_IGNORE_CHANNELS`.
 
 Memory is stored as markdown on disk:
 
@@ -126,15 +127,16 @@ Each user file is human-readable and can be edited by hand. Example:
 
 How it works:
 
-- Before replying, the bot loads the invoking user's memory and server memory.
-- After replying, a background model call extracts high-confidence facts from the invoking user's own messages.
+- Passive messages are batched per author every 60 seconds by default.
+- A background model call extracts high-confidence facts from that author's own messages.
 - It only stores first-person facts that people state about themselves.
 - Claims about other users are ignored, even if the speaker mentions them.
 - It does not learn from other users' messages or from the bot's own replies.
 - Facts are deduplicated, filtered for sensitive data, and appended to the markdown files.
 - Server memory is not written automatically. Admins can view and edit it manually.
-- Memory is automatic. The model does not need a memory write tool.
+- Memory is automatic. The model does not need a memory write tool and does not need to be mentioned.
 - `disable_memory` on `/ask` skips both reads and writes for that ask.
+- `MEMORY_PASSIVE_ENABLED=false` disables passive learning.
 
 Memory commands:
 
@@ -224,6 +226,10 @@ Copy `.env.example` to `.env` and fill it in, or set the same variables in your 
 | `MEMORY_MAX_CONTEXT_CHARS` | `3000` | Maximum memory characters injected into a chat request |
 | `MEMORY_MIN_CONFIDENCE` | `0.7` | Minimum confidence for a stored fact |
 | `MEMORY_EXTRACT_TIMEOUT_SECONDS` | `30` | Background memory extraction timeout |
+| `MEMORY_PASSIVE_ENABLED` | `true` | Learn from normal guild messages automatically |
+| `MEMORY_BATCH_SECONDS` | `60` | Batch window for passive learning |
+| `MEMORY_MAX_BATCH_MESSAGES` | `20` | Maximum messages per user batch |
+| `MEMORY_IGNORE_CHANNELS` | empty | Comma-separated channel IDs to skip for passive learning |
 
 If `OPENROUTER_API_KEY` is empty, the bot still runs and `/link` works. Mention chat is disabled with a startup warning.
 

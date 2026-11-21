@@ -173,7 +173,7 @@ Context rules:
 - Bot messages become `assistant` turns.
 - Other messages become `user` turns prefixed with the author's display name.
 - A system prompt tells the bot its stack: Go, discordgo, Railway, OpenRouter, and DeepSeek V4.1 Flash 1017.
-- It also tells the bot that memory is automatic, tool-free, and limited to facts people share about themselves. It must not claim it cannot remember between sessions.
+- It also tells the bot that memory is automatic, tool-free, does not require a mention, and is limited to facts people share about themselves. It must not claim it cannot remember between sessions.
 - It requires inline Discord markdown citations for web search results, using short relevant phrases as link text and at most two citations by default.
 - It makes replies peer-like: casual, direct, and free of unsolicited remediation.
 - It bans em dashes and asks for short, simple sentences.
@@ -205,24 +205,26 @@ Read path:
 
 Write path:
 
-- After a reply, run a background extraction call.
-- Use only the invoking user's own messages as the transcript.
+- Passive memory observes normal guild messages through a separate collector.
+- Batch messages per author every `MEMORY_BATCH_SECONDS`.
+- Use only that author's own messages as the transcript.
 - Extract only first-person facts that the speaker states about themselves.
 - Ignore statements about other people, even when the speaker mentions them.
 - Ignore bot messages, other bots, and other users' messages.
 - Never write facts about another user based on what someone else said.
+- Skip channels listed in `MEMORY_IGNORE_CHANNELS`.
 - Filter out secrets, credentials, addresses, health data, and sensitive personal data.
 - Filter by `MEMORY_MIN_CONFIDENCE`.
 - Deduplicate against existing markdown.
 - Write atomically with a temporary file and rename.
 - Use JSON response format and enough output tokens to avoid truncated JSON.
 - Do not auto-write server memory. Server memory is manual/admin-managed.
+- When passive memory is enabled, mention and reply chat skips its own extraction to avoid duplicate calls. `/ask` still extracts because it has no message event.
 
 Rules:
 
-- Memory is enabled only for invoked conversations.
+- Memory is enabled for normal messages when `MEMORY_PASSIVE_ENABLED=true`.
 - `disable_memory` on `/ask` skips reads and writes.
-- The bot must never scan normal channel traffic.
 - The system prompt must say memory is automatic and self-only, and that no memory tool is needed.
 - `/memory view` and `/memory forget` work on the invoker's own memory by default.
 - Admins can target another user with `user:@someone` or server memory with `server:true`.
@@ -264,6 +266,7 @@ Configuration uses Viper and dotenv.
 - Memory is enabled by default with `MEMORY_ENABLED=true`.
 - `MEMORY_DIR` defaults to `./memory`. On Railway, use a volume and set `MEMORY_DIR=/data/memory`.
 - `MEMORY_MAX_CONTEXT_CHARS`, `MEMORY_MIN_CONFIDENCE`, and `MEMORY_EXTRACT_TIMEOUT_SECONDS` control memory size and extraction.
+- `MEMORY_PASSIVE_ENABLED`, `MEMORY_BATCH_SECONDS`, `MEMORY_MAX_BATCH_MESSAGES`, and `MEMORY_IGNORE_CHANNELS` control passive learning.
 
 ---
 
