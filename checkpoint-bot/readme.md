@@ -116,7 +116,7 @@ Details:
 - Reminders are private in listings. Only the creator and participants see them.
 - Events are public. Everyone sees active events in their list.
 - Recurring schedules support daily, weekly, monthly, and intervals such as every other week.
-- Times are stored in the user's timezone and displayed with Discord timestamps.
+- Times are computed in the user's timezone and stored in UTC. Discord timestamps display them locally.
 - Missed reminders fire only if they are less than 60 minutes late.
 - `/reminders` lists your reminders and public events, and lets you cancel or leave.
 - `/reminders` responses are ephemeral.
