@@ -12,7 +12,8 @@ func GetInviteLink(botID string) string {
 		int64(discordgo.PermissionSendMessages) |
 		int64(discordgo.PermissionSendMessagesInThreads) |
 		int64(discordgo.PermissionReadMessageHistory) |
-		int64(discordgo.PermissionAttachFiles)
+		int64(discordgo.PermissionAttachFiles) |
+		int64(discordgo.PermissionAddReactions)
 
 	return fmt.Sprintf(
 		"https://discord.com/api/oauth2/authorize?client_id=%s&permissions=%d&scope=bot%%20applications.commands",

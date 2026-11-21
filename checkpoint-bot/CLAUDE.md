@@ -20,6 +20,8 @@
 - Bot lifecycle: `internal/server/bot.go`
 - Chat pipeline: `internal/server/chat.go`
 - Memory store and extraction: `internal/memory/`
+- Reminder store, parser, scheduler: `internal/reminders/`
+- Reminder Discord integration: `internal/server/reminders.go`
 - OpenRouter chat client: `internal/llm/openrouter.go`
 - OpenRouter image client: `internal/imagegen/openrouter.go`
 - Rate limiter: `internal/ratelimit/ratelimit.go`
@@ -47,6 +49,7 @@ Features:
 3. `/ask` runs the same chat pipeline with configurable history and memory opt-out.
 4. `/memory` lets users inspect and remove their own memory. Admins can target other users or server memory.
 5. `/imagine` generates images through OpenRouter, with an optional reference image.
+6. Reminders and events are created from natural language, stored as JSON, and fired by a scheduler.
 
 `cmd/root.go` starts the bot and handles shutdown. `internal/server.NewBot` creates the Discord session and sets the required intents. `Bot.Start` connects, registers the chat handler, installs slash commands, and handles newly joined servers.
 
@@ -212,6 +215,26 @@ The OpenRouter message format uses a content array with a text part first and `i
 
 ---
 
+## Reminders and Events
+
+Location: `internal/reminders/` and `internal/server/reminders.go`
+
+- Reminders are private records. Events are public and joinable.
+- Natural language is parsed by a dedicated JSON LLM call, not the main chat call.
+- Users must set a timezone with `/timezone` before creating reminders.
+- Store data in `REMINDERS_PATH` as JSON with atomic writes.
+- The scheduler ticks every `REMINDER_TICK_SECONDS`.
+- Recurrence supports daily, weekly, monthly, and interval.
+- Next run times are computed in the user's timezone and stored in UTC.
+- Missed reminders older than `REMINDER_GRACE_MINUTES` are skipped.
+- Announcements are public and joinable by replying with `me too`, `+1`, and similar.
+- Join and leave replies must be intercepted before normal chat.
+- Trigger messages mention the creator and participants.
+- `/reminders` is ephemeral and supports list, cancel, and leave.
+- Do not use the main chat memory or web search for reminder parsing or writing.
+
+---
+
 ## Image Generation
 
 Location: `internal/imagegen/` and `internal/server/commands/imagine.go`
@@ -308,6 +331,7 @@ Configuration uses Viper and dotenv.
 - `MEMORY_MAX_CONTEXT_CHARS`, `MEMORY_MIN_CONFIDENCE`, and `MEMORY_EXTRACT_TIMEOUT_SECONDS` control memory size and extraction.
 - `MEMORY_PASSIVE_ENABLED`, `MEMORY_BATCH_SECONDS`, `MEMORY_MAX_BATCH_MESSAGES`, and `MEMORY_IGNORE_CHANNELS` control passive learning.
 - `IMAGE_ENABLED`, `IMAGE_MODEL`, `IMAGE_DEFAULT_RESOLUTION`, `IMAGE_DEFAULT_ASPECT_RATIO`, `IMAGE_MAX_REFERENCE_MB`, `IMAGE_TIMEOUT_SECONDS`, and `IMAGE_RATE_LIMIT_PER_HOUR` control image generation.
+- `REMINDERS_ENABLED`, `REMINDERS_PATH`, `REMINDER_TICK_SECONDS`, `REMINDER_GRACE_MINUTES`, and `REMINDER_MAX_PER_USER` control reminders.
 - `VISION_ENABLED`, `VISION_MAX_IMAGES`, `VISION_MAX_IMAGE_MB`, and `VISION_DETAIL` control image understanding.
 
 ---
@@ -321,6 +345,8 @@ Configuration uses Viper and dotenv.
 - Add table-driven cases for link rewriting.
 - Test the memory store with `t.TempDir()`.
 - Test extraction with a fake chat client.
+- Test reminder recurrence with fixed times and IANA timezones.
+- Test the reminder store and scheduler with `t.TempDir()` and a fake trigger.
 - Run `go test ./...`, `go vet ./...`, and `go build ./...` before finishing.
 
 ---

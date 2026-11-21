@@ -43,12 +43,21 @@ type ImageService interface {
 	Generate(ctx context.Context, req imagegen.Request) (imagegen.Result, error)
 }
 
+// ReminderService manages user timezones and reminder records.
+type ReminderService interface {
+	SetTimezone(userID, zone string) error
+	ListForUser(userID string) string
+	Cancel(userID, idPrefix string) (bool, error)
+	Leave(userID, idPrefix string) (bool, error)
+}
+
 // CommandHandler manages Discord slash command registration and execution.
 type CommandHandler struct {
 	DiscordClient          *discordgo.Session
 	Chat                   ChatService
 	Memory                 MemoryService
 	Images                 ImageService
+	Reminders              ReminderService
 	ImageLimiter           *ratelimit.Limiter
 	ImageModel             string
 	ImageResolution        string

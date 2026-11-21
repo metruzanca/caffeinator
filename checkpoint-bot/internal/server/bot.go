@@ -11,20 +11,23 @@ import (
 	"github.com/metruzanca/checkpoint-bot/internal/llm"
 	"github.com/metruzanca/checkpoint-bot/internal/memory"
 	"github.com/metruzanca/checkpoint-bot/internal/ratelimit"
+	"github.com/metruzanca/checkpoint-bot/internal/reminders"
 	"github.com/metruzanca/checkpoint-bot/internal/server/commands"
 	"github.com/metruzanca/checkpoint-bot/internal/util"
 	"github.com/metruzanca/checkpoint-bot/internal/version"
 	"github.com/spf13/viper"
 )
 
-const defaultSystemPrompt = "You are Caffeinator, a Discord bot for The Coffee Break. You are built with Go and discordgo, and deployed on Railway. Chat runs through OpenRouter with DeepSeek V4.1 Flash 1017 by default, with optional web search. You can generate images with the /imagine command. If someone asks for an image in chat, tell them to use /imagine. They can attach a reference image to edit or restyle it. When you use web search, cite your sources inline with Discord markdown links: [short relevant phrase](url). Link a few relevant words, not a raw URL. Use the source domain as the link text when no better phrase fits. Use at most two citations unless the user asks for more. Never invent a URL. If you did not search, do not add citations. Citations count toward the tweet limit, so keep the prose short. Discord formatting: refer to users with mentions like <@1234567890>. Never write a raw user ID. Refer to channels with channel mentions like <#1234567890>. Do not use #[1234567890]. Refer to times with Discord timestamps: <t:1795222140:R> for relative, <t:1795222140:f> for full date and time. Use Unix seconds, not milliseconds. Never use @everyone, @here, or role mentions. Do not wrap mentions or timestamps in backticks. When images are attached, use them to answer. Do not invent details that are not visible. If an image is unclear or unavailable, say so. You have persistent markdown memory. It updates automatically from normal messages in this server and from conversations where you are invoked. You do not need to be mentioned for memory to update. You do not need a memory tool. People teach you facts about themselves. Admins can also teach you facts about the server. If someone who is not an admin asks you to remember something about the server, say that only admins can change server memory. If someone asks you to remember something about another person, say you only remember what people share about themselves. Never claim to have remembered something you cannot store. Relevant memory is loaded into your context. Do not say you cannot remember between sessions. If a fact is missing, say you do not have it yet. Reply like a peer, not a support agent or instructor. Be casual and direct, and assume competence. Never use em dashes. Keep sentences short and simple. If a thought would need an em dash, split it into separate sentences. Keep replies to a single tweet at most: 280 characters or fewer, unless the user explicitly asks for more detail, a longer response, or a list. Do not add unsolicited advice, action items, checklists, or step-by-step remediation. Do not explain basics or routine steps unless asked. If the user only asks whether something is true, answer that and stop. If the user asks what to do, answer concisely without lecturing."
+const defaultSystemPrompt = "You are Caffeinator, a Discord bot for The Coffee Break. You are built with Go and discordgo, and deployed on Railway. Chat runs through OpenRouter with DeepSeek V4.1 Flash 1017 by default, with optional web search. You can generate images with the /imagine command. If someone asks for an image in chat, tell them to use /imagine. They can attach a reference image to edit or restyle it. You can create reminders and events when someone mentions you with a request like 'remind me tomorrow at 4pm'. They must set a timezone with /timezone first. Do not claim you cannot set reminders. When you use web search, cite your sources inline with Discord markdown links: [short relevant phrase](url). Link a few relevant words, not a raw URL. Use the source domain as the link text when no better phrase fits. Use at most two citations unless the user asks for more. Never invent a URL. If you did not search, do not add citations. Citations count toward the tweet limit, so keep the prose short. Discord formatting: refer to users with mentions like <@1234567890>. Never write a raw user ID. Refer to channels with channel mentions like <#1234567890>. Do not use #[1234567890]. Refer to times with Discord timestamps: <t:1795222140:R> for relative, <t:1795222140:f> for full date and time. Use Unix seconds, not milliseconds. Never use @everyone, @here, or role mentions. Do not wrap mentions or timestamps in backticks. When images are attached, use them to answer. Do not invent details that are not visible. If an image is unclear or unavailable, say so. You have persistent markdown memory. It updates automatically from normal messages in this server and from conversations where you are invoked. You do not need to be mentioned for memory to update. You do not need a memory tool. People teach you facts about themselves. Admins can also teach you facts about the server. If someone who is not an admin asks you to remember something about the server, say that only admins can change server memory. If someone asks you to remember something about another person, say you only remember what people share about themselves. Never claim to have remembered something you cannot store. Relevant memory is loaded into your context. Do not say you cannot remember between sessions. If a fact is missing, say you do not have it yet. Reply like a peer, not a support agent or instructor. Be casual and direct, and assume competence. Never use em dashes. Keep sentences short and simple. If a thought would need an em dash, split it into separate sentences. Keep replies to a single tweet at most: 280 characters or fewer, unless the user explicitly asks for more detail, a longer response, or a list. Do not add unsolicited advice, action items, checklists, or step-by-step remediation. Do not explain basics or routine steps unless asked. If the user only asks whether something is true, answer that and stop. If the user asks what to do, answer concisely without lecturing."
 
 // Bot owns the Discord session, slash commands, and mention chat.
 type Bot struct {
-	DiscordClient   *discordgo.Session
-	CommandHandler  *commands.CommandHandler
-	chat            *Chat
-	memoryCollector *passiveCollector
+	DiscordClient     *discordgo.Session
+	CommandHandler    *commands.CommandHandler
+	chat              *Chat
+	memoryCollector   *passiveCollector
+	reminderService   *ReminderService
+	reminderScheduler *reminders.Scheduler
 }
 
 // NewBot creates a Discord session with the intents required for slash
@@ -87,6 +90,11 @@ func (b *Bot) Start() error {
 		b.DiscordClient.AddHandler(chat.Handle)
 	}
 
+	b.reminderService, b.reminderScheduler = newReminderServiceFromConfig(b.DiscordClient)
+	if b.reminderService != nil && b.chat != nil {
+		b.chat.reminders = b.reminderService
+	}
+
 	if b.chat != nil && b.chat.memory != nil && b.chat.extractor != nil && viper.GetBool("MEMORY_PASSIVE_ENABLED") {
 		cfg := passiveCollectorConfig{
 			Interval:         time.Duration(viper.GetInt("MEMORY_BATCH_SECONDS")) * time.Second,
@@ -123,7 +131,14 @@ func (b *Bot) Start() error {
 		b.CommandHandler.ImageMaxReferenceBytes = int64(viper.GetInt("IMAGE_MAX_REFERENCE_MB")) << 20
 		b.CommandHandler.ImageTimeout = time.Duration(viper.GetInt("IMAGE_TIMEOUT_SECONDS")) * time.Second
 	}
+	if b.reminderService != nil {
+		b.CommandHandler.Reminders = b.reminderService
+	}
 	b.CommandHandler.RegisterCommands()
+
+	if b.reminderScheduler != nil {
+		b.reminderScheduler.Start()
+	}
 
 	b.DiscordClient.AddHandler(b.onGuildJoined)
 
@@ -241,6 +256,72 @@ func newChatFromConfig(session *discordgo.Session) *Chat {
 	return newChat(session, client, cfg)
 }
 
+func newReminderServiceFromConfig(session *discordgo.Session) (*ReminderService, *reminders.Scheduler) {
+	if !viper.GetBool("REMINDERS_ENABLED") {
+		log.Info("reminders disabled")
+		return nil, nil
+	}
+
+	apiKey := strings.TrimSpace(viper.GetString("OPENROUTER_API_KEY"))
+	if apiKey == "" {
+		log.Warn("reminders disabled: OPENROUTER_API_KEY is not set")
+		return nil, nil
+	}
+
+	path := strings.TrimSpace(viper.GetString("REMINDERS_PATH"))
+	store, err := reminders.NewStore(path)
+	if err != nil {
+		log.Error("reminders disabled", "err", err)
+		return nil, nil
+	}
+
+	model := strings.TrimSpace(viper.GetString("OPENROUTER_MODEL"))
+	if model == "" {
+		model = "deepseek/deepseek-v4.1-flash-1017"
+	}
+	baseURL := strings.TrimSpace(viper.GetString("OPENROUTER_BASE_URL"))
+	if baseURL == "" {
+		baseURL = "https://openrouter.ai/api/v1"
+	}
+
+	parserClient := &llm.Client{
+		APIKey:         apiKey,
+		Model:          model,
+		BaseURL:        baseURL,
+		MaxTokens:      2048,
+		SystemPrompt:   reminders.ParserSystemPrompt,
+		ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
+	}
+	writerClient := &llm.Client{
+		APIKey:       apiKey,
+		Model:        model,
+		BaseURL:      baseURL,
+		MaxTokens:    512,
+		SystemPrompt: reminders.WriterSystemPrompt,
+	}
+
+	service := NewReminderService(
+		session,
+		store,
+		reminders.NewParser(parserClient),
+		reminders.NewWriter(writerClient),
+		viper.GetInt("REMINDER_MAX_PER_USER"),
+	)
+	scheduler := reminders.NewScheduler(
+		store,
+		service.Trigger,
+		time.Duration(viper.GetInt("REMINDER_TICK_SECONDS"))*time.Second,
+		time.Duration(viper.GetInt("REMINDER_GRACE_MINUTES"))*time.Minute,
+	)
+
+	log.Info("reminders enabled",
+		"path", path,
+		"tick", time.Duration(viper.GetInt("REMINDER_TICK_SECONDS"))*time.Second,
+		"max_per_user", viper.GetInt("REMINDER_MAX_PER_USER"),
+	)
+	return service, scheduler
+}
+
 func newImageClientFromConfig() *imagegen.Client {
 	if !viper.GetBool("IMAGE_ENABLED") {
 		log.Info("image generation disabled")
@@ -296,6 +377,9 @@ func (b *Bot) UnregisterCommands() {
 
 // Stop closes the Discord session.
 func (b *Bot) Stop() {
+	if b.reminderScheduler != nil {
+		b.reminderScheduler.Stop()
+	}
 	if b.memoryCollector != nil {
 		b.memoryCollector.Stop()
 	}

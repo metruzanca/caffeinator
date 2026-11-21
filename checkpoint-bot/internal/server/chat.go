@@ -73,6 +73,7 @@ type Chat struct {
 	systemPrompt string
 	memory       *memory.Store
 	extractor    memoryExtractor
+	reminders    *ReminderService
 	limiter      *ratelimit.Limiter
 	sem          chan struct{}
 }
@@ -153,6 +154,10 @@ func (c *Chat) handle(m *discordgo.MessageCreate, botID string, serverAdmin bool
 		return
 	}
 	if m.GuildID == "" || botID == "" {
+		return
+	}
+
+	if c.reminders != nil && c.reminders.HandleMessage(context.Background(), m) {
 		return
 	}
 

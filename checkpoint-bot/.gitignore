@@ -6,6 +6,8 @@ checkpoint-bot
 db
 # Local bot memory
 /memory/
+# Local reminders
+/reminders.json
 # Local environment
 .env
 .env.*

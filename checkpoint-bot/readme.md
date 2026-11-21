@@ -31,6 +31,8 @@ Checkpoint and goal tracking were removed. If that feature comes back, it will s
 |---|---|
 | `/link url:<url>` | Rewrites X/Twitter links to `fxtwitter.com` and Instagram links to `kkinstagram.com`, and removes tracking query parameters. |
 | `/imagine prompt:<text> [image] [aspect_ratio] [resolution]` | Generates an image. Attach a reference image to edit or restyle it. |
+| `/timezone zone:<iana>` | Sets your timezone for reminders. |
+| `/reminders list\|cancel\|leave` | Lists and manages your reminders. Responses are ephemeral. |
 | `/ask text:<text> [history_length] [disable_memory]` | Runs the same chat pipeline as a mention. `history_length` defaults to 10 and can go up to 100. Set `disable_memory` to skip memory reads and writes for that ask. Responses are public. |
 | `/memory view\|forget\|list` | View or forget memory. Everyone can manage their own memory. Admins can target other users or server memory and list users. Responses are ephemeral. |
 
@@ -73,6 +75,59 @@ Defaults:
 Reference images are downloaded from Discord, converted to base64, and sent to OpenRouter. PNG, JPEG, and WebP are accepted. The default limit is 8 MB.
 
 Image generation is billed per image by OpenRouter, not by tokens. Seedream 5.0 Flash costs about $0.018 per image at the time of writing.
+
+---
+
+## Reminders and events
+
+Create reminders by mentioning the bot:
+
+```text
+@Caffeinator remind me tomorrow at 4pm
+@Caffeinator remind me every Monday at 9am to post the standup
+@Caffeinator create an event for Friday at 3pm
+```
+
+Set your timezone first:
+
+```text
+/timezone zone:America/New_York
+```
+
+The bot posts a public announcement when a reminder is created. Other users can reply to it:
+
+```text
+me too
+count me in
++1
+```
+
+They can leave with:
+
+```text
+leave
+remove me
+```
+
+At the scheduled time, the bot mentions the creator and everyone who joined.
+
+Details:
+
+- Reminders are private in listings. Only the creator and participants see them.
+- Events are public. Everyone sees active events in their list.
+- Recurring schedules support daily, weekly, monthly, and intervals such as every other week.
+- Times are stored in the user's timezone and displayed with Discord timestamps.
+- Missed reminders fire only if they are less than 60 minutes late.
+- `/reminders` lists your reminders and public events, and lets you cancel or leave.
+- `/reminders` responses are ephemeral.
+
+Storage:
+
+```text
+/data/reminders.json
+```
+
+The scheduler ticks every 15 seconds. Reminders are persisted across restarts.
 
 ---
 
@@ -239,6 +294,7 @@ For local development, the default is `./memory`.
    - Send Messages in Threads
    - Read Message History
    - Attach Files
+   - Add Reactions
 
 The generated invite link requests exactly these permissions and includes the `bot` and `applications.commands` scopes.
 
@@ -277,6 +333,11 @@ Copy `.env.example` to `.env` and fill it in, or set the same variables in your 
 | `IMAGE_MAX_REFERENCE_MB` | `8` | Maximum reference image size |
 | `IMAGE_TIMEOUT_SECONDS` | `120` | Image generation timeout |
 | `IMAGE_RATE_LIMIT_PER_HOUR` | `5` | Image generations per user per hour |
+| `REMINDERS_ENABLED` | `true` | Enable reminders and events |
+| `REMINDERS_PATH` | `./reminders.json` | Reminder JSON file. Use `/data/reminders.json` on Railway |
+| `REMINDER_TICK_SECONDS` | `15` | Scheduler tick interval |
+| `REMINDER_GRACE_MINUTES` | `60` | How late a missed reminder may still fire |
+| `REMINDER_MAX_PER_USER` | `50` | Maximum active reminders per user |
 | `MEMORY_ENABLED` | `true` | Enable markdown memory |
 | `MEMORY_DIR` | `./memory` | Memory directory. Use `/data/memory` with a Railway volume |
 | `MEMORY_MAX_CONTEXT_CHARS` | `3000` | Maximum memory characters injected into a chat request |
@@ -347,6 +408,7 @@ checkpoint-bot/
 │   ├── llm/                   # OpenRouter chat client
 │   ├── memory/                # Markdown memory store and extraction
 │   ├── ratelimit/             # Shared token bucket limiter
+│   ├── reminders/             # Reminder store, parser, recurrence, scheduler
 │   ├── server/                # Bot lifecycle and chat pipeline
 │   │   └── commands/          # Slash commands
 │   └── util/                  # Small helpers
@@ -367,7 +429,7 @@ go test ./...
 go vet ./...
 ```
 
-The suite covers link rewriting, context assembly, mention detection, `/ask`, memory storage and extraction, image generation request/response handling, response chunking, rate limiting, and the OpenRouter clients (with `httptest`, no live API calls).
+The suite covers link rewriting, context assembly, mention detection, `/ask`, memory storage and extraction, image generation request/response handling, reminders and recurrence, response chunking, rate limiting, and the OpenRouter clients (with `httptest`, no live API calls).
 
 ### Logging
 
