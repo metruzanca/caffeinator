@@ -66,7 +66,8 @@ Web search:
 
 - The model can search the web when it decides it needs current information.
 - Searches are capped at 2 per request and 3 results per search by default.
-- Citations come back as normal markdown links.
+- Citations come back as inline Discord markdown links, with a short relevant phrase as the link text.
+- The prompt asks for at most two citations unless the user asks for more, and forbids inventing URLs.
 - Web search uses OpenRouter credits, roughly $0.007 per search with the default Exa engine, plus model token costs. Casual mentions that do not need current information should not search at all.
 
 Other behavior:
