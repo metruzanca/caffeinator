@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -116,6 +117,74 @@ func TestGenerateAPIError(t *testing.T) {
 	_, err := client.Generate(context.Background(), Request{Prompt: "hello"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "bad prompt")
+}
+
+func TestGenerateContentBlockedSexual(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"message":"Black Forest Labs blocked this request: it was flagged for sexual or adult content."}}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		APIKey:     "test-key",
+		Model:      "black-forest-labs/flux-3-image-klein",
+		BaseURL:    server.URL,
+		HTTPClient: server.Client(),
+	}
+
+	_, err := client.Generate(context.Background(), Request{Prompt: "hello"})
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrContentBlocked)
+
+	var blocked *ContentBlockedError
+	require.True(t, errors.As(err, &blocked))
+	require.Equal(t, BlockedSexual, blocked.Category)
+	require.Equal(t, http.StatusBadRequest, blocked.StatusCode)
+}
+
+func TestGenerateContentBlockedOther(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"message":"The request violated the content policy."}}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		APIKey:     "test-key",
+		Model:      "black-forest-labs/flux-3-image-klein",
+		BaseURL:    server.URL,
+		HTTPClient: server.Client(),
+	}
+
+	_, err := client.Generate(context.Background(), Request{Prompt: "hello"})
+	require.Error(t, err)
+
+	var blocked *ContentBlockedError
+	require.True(t, errors.As(err, &blocked))
+	require.Equal(t, BlockedOther, blocked.Category)
+}
+
+func TestGenerateNonModerationError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":{"message":"invalid image size"}}`))
+	}))
+	defer server.Close()
+
+	client := &Client{
+		APIKey:     "test-key",
+		Model:      "black-forest-labs/flux-3-image-klein",
+		BaseURL:    server.URL,
+		HTTPClient: server.Client(),
+	}
+
+	_, err := client.Generate(context.Background(), Request{Prompt: "hello"})
+	require.Error(t, err)
+	require.NotErrorIs(t, err, ErrContentBlocked)
+
+	var blocked *ContentBlockedError
+	require.False(t, errors.As(err, &blocked))
 }
 
 func TestGenerateRequiresPrompt(t *testing.T) {

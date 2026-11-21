@@ -3,12 +3,14 @@ package commands
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/metruzanca/checkpoint-bot/internal/imagegen"
 	"github.com/stretchr/testify/require"
 )
 
@@ -76,6 +78,24 @@ func TestImageCaption(t *testing.T) {
 	require.Equal(t, "a cat in space", imageCaption("  a cat in space  "))
 	require.Equal(t, "a cat in space", imageCaption("a cat in space"))
 	require.Empty(t, imageCaption("   "))
+}
+
+func TestImageGenerationErrorMessage(t *testing.T) {
+	sexual := &imagegen.ContentBlockedError{
+		Reason:   "flagged for sexual or adult content",
+		Category: imagegen.BlockedSexual,
+	}
+	require.Equal(t, "That's a bit too lewd for my liking. This is a Christian server.", imageGenerationErrorMessage(sexual, false))
+	require.Contains(t, imageGenerationErrorMessage(sexual, true), "flagged for sexual or adult content")
+
+	other := &imagegen.ContentBlockedError{
+		Reason:   "violated the content policy",
+		Category: imagegen.BlockedOther,
+	}
+	require.Equal(t, "The image provider blocked that prompt.", imageGenerationErrorMessage(other, false))
+	require.Contains(t, imageGenerationErrorMessage(other, true), "violated the content policy")
+
+	require.Equal(t, "Image generation failed. Try again in a bit.", imageGenerationErrorMessage(errors.New("boom"), false))
 }
 
 func TestResolveImageSafetyTolerance(t *testing.T) {

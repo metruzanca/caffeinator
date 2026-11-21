@@ -19,6 +19,36 @@ const (
 	maxBodyBytes   = 64 << 20
 )
 
+// ErrContentBlocked indicates the image provider rejected the prompt or output.
+var ErrContentBlocked = errors.New("image content blocked")
+
+// BlockedCategory classifies a content block.
+type BlockedCategory string
+
+const (
+	BlockedSexual BlockedCategory = "sexual"
+	BlockedOther  BlockedCategory = "other"
+)
+
+// ContentBlockedError describes a provider moderation block.
+type ContentBlockedError struct {
+	Reason     string
+	Category   BlockedCategory
+	StatusCode int
+}
+
+func (e *ContentBlockedError) Error() string {
+	if strings.TrimSpace(e.Reason) == "" {
+		return "image content blocked"
+	}
+	return e.Reason
+}
+
+// Unwrap allows errors.Is(err, ErrContentBlocked).
+func (e *ContentBlockedError) Unwrap() error {
+	return ErrContentBlocked
+}
+
 // Request describes one image generation request.
 type Request struct {
 	Prompt           string
@@ -165,10 +195,26 @@ func (c *Client) Generate(ctx context.Context, req Request) (Result, error) {
 
 	if resp.StatusCode >= http.StatusBadRequest {
 		var apiErr imageResponse
-		if json.Unmarshal(data, &apiErr) == nil && apiErr.Error != nil && apiErr.Error.Message != "" {
+		message := ""
+		if json.Unmarshal(data, &apiErr) == nil && apiErr.Error != nil {
+			message = strings.TrimSpace(apiErr.Error.Message)
+		}
+		if message == "" {
+			message = truncate(string(data), 300)
+		}
+
+		if resp.StatusCode == http.StatusBadRequest && isModerationMessage(message) {
+			return Result{}, &ContentBlockedError{
+				Reason:     message,
+				Category:   classifyBlocked(message),
+				StatusCode: resp.StatusCode,
+			}
+		}
+
+		if apiErr.Error != nil && apiErr.Error.Message != "" {
 			return Result{}, fmt.Errorf("openrouter image: %s (status %d)", apiErr.Error.Message, resp.StatusCode)
 		}
-		return Result{}, fmt.Errorf("openrouter image: status %d: %s", resp.StatusCode, truncate(string(data), 300))
+		return Result{}, fmt.Errorf("openrouter image: status %d: %s", resp.StatusCode, message)
 	}
 
 	var parsed imageResponse
@@ -221,6 +267,38 @@ func (c *Client) httpClient() *http.Client {
 		return c.HTTPClient
 	}
 	return http.DefaultClient
+}
+
+func isModerationMessage(message string) bool {
+	message = strings.ToLower(message)
+	phrases := []string{
+		"blocked this request",
+		"flagged for sexual",
+		"adult content",
+		"content policy",
+		"moderation",
+		"nudity",
+		"nsfw",
+		"safety filter",
+		"sensitive content",
+	}
+	for _, phrase := range phrases {
+		if strings.Contains(message, phrase) {
+			return true
+		}
+	}
+	return false
+}
+
+func classifyBlocked(message string) BlockedCategory {
+	message = strings.ToLower(message)
+	sexualPhrases := []string{"sexual", "adult content", "nsfw", "nudity", "explicit"}
+	for _, phrase := range sexualPhrases {
+		if strings.Contains(message, phrase) {
+			return BlockedSexual
+		}
+	}
+	return BlockedOther
 }
 
 func truncate(s string, max int) string {

@@ -254,6 +254,10 @@ Location: `internal/imagegen/` and `internal/server/commands/imagine.go`
 - Reject an explicit `safety_tolerance` in a normal channel.
 - Check the parent channel for threads.
 - Higher tolerance does not allow illegal content.
+- Detect `imagegen.ContentBlockedError` and return a moderation-specific message.
+- In normal channels, use a cheeky non-explicit message and do not redirect to NSFW channels.
+- In NSFW channels, include the provider moderation reason.
+- Keep unrelated failures on the generic error message.
 
 ---
 

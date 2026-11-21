@@ -81,6 +81,11 @@ Reference images are downloaded from Discord, converted to base64, and sent to O
 
 Image generation is billed per image by OpenRouter, not by tokens. Flux 3 Image Klein costs about $0.009 per image at 1K at the time of writing. Higher tolerance does not guarantee explicit output. Black Forest Labs still blocks illegal content.
 
+If the provider blocks a prompt:
+
+- Normal channels get a cheeky, non-explicit response. The bot does not redirect people to NSFW channels.
+- NSFW channels get the provider’s moderation reason.
+
 ---
 
 ## Reminders and events

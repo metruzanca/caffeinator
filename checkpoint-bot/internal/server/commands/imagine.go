@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -162,7 +163,7 @@ var ImagineCmd = &Command{
 		})
 		if err != nil {
 			log.Error("image generation failed", "err", err, "user", userID, "channel", i.ChannelID)
-			editInteractionError(s, i, "Image generation failed. Try again in a bit.")
+			editInteractionError(s, i, imageGenerationErrorMessage(err, nsfw))
 			return
 		}
 
@@ -286,6 +287,24 @@ func imageFiles(images []imagegen.Output) []*discordgo.File {
 		})
 	}
 	return files
+}
+
+func imageGenerationErrorMessage(err error, nsfw bool) string {
+	var blocked *imagegen.ContentBlockedError
+	if errors.As(err, &blocked) {
+		if nsfw {
+			reason := strings.TrimSpace(blocked.Reason)
+			if reason == "" {
+				reason = "content policy"
+			}
+			return "Blocked by the image provider: " + reason
+		}
+		if blocked.Category == imagegen.BlockedSexual {
+			return "That's a bit too lewd for my liking. This is a Christian server."
+		}
+		return "The image provider blocked that prompt."
+	}
+	return "Image generation failed. Try again in a bit."
 }
 
 func channelIsNSFW(s *discordgo.Session, channelID string) (bool, error) {
