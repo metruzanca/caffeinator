@@ -52,7 +52,7 @@ The rewritten link is posted publicly so everyone can click or preview it.
 
 ## Image generation
 
-`/imagine` generates images through OpenRouter using `black-forest-labs/flux-3-image-klein` by default.
+`/imagine` generates images through OpenRouter using `black-forest-labs/flux.2-klein-4b` by default.
 
 ```text
 /imagine prompt:a red panda astronaut, studio lighting
@@ -63,23 +63,22 @@ Options:
 
 - `image` is an optional reference image for editing or style transfer.
 - `aspect_ratio` supports `1:1`, `16:9`, `9:16`, `4:3`, `3:4`, `3:2`, `2:3`, and `auto`.
-- `resolution` supports `1K`, `1.5K`, and `2K`.
-- `safety_tolerance` supports `0` through `4`, but can only be changed in NSFW channels. Flux 3 Image maxes out at `4`.
+- `resolution` supports `1K`, `1.5K`, and `2K` on Flux 3 and Seedream. Flux 2 uses aspect ratio only.
+- `safety_tolerance` supports `0` through `5` on Flux 2, and `0` through `4` on Flux 3. It can only be changed in NSFW channels.
 
 Defaults:
 
-- Resolution `1K`
 - Aspect ratio `1:1`
 - Safety tolerance `2` in normal channels
-- Safety tolerance `4` in NSFW channels
+- Safety tolerance `5` in NSFW channels
 - One image per request
 - Five generations per user per hour
 
-Normal channels always use tolerance `2`. An explicit `safety_tolerance` in a normal channel is rejected. NSFW channels can use `0` through `4`. Threads inherit the parent channel’s NSFW status.
+Normal channels always use tolerance `2`. An explicit `safety_tolerance` in a normal channel is rejected. NSFW channels can use `0` through `5`. Threads inherit the parent channel’s NSFW status.
 
 Reference images are downloaded from Discord, converted to base64, and sent to OpenRouter. PNG, JPEG, and WebP are accepted. The default limit is 8 MB.
 
-Image generation is billed per image by OpenRouter, not by tokens. Flux 3 Image Klein costs about $0.009 per image at 1K at the time of writing. Higher tolerance does not guarantee explicit output. Black Forest Labs still blocks illegal content.
+Image generation is billed per image by OpenRouter, not by tokens. Flux 2 Klein 4B costs about $0.014 per megapixel at the time of writing. Higher tolerance does not guarantee explicit output. Black Forest Labs still blocks illegal content.
 
 If the provider blocks a prompt:
 
@@ -340,11 +339,11 @@ Copy `.env.example` to `.env` and fill it in, or set the same variables in your 
 | `CHAT_RATE_LIMIT_CAPACITY` | `1` | Requests allowed per user per window |
 | `CHAT_RATE_LIMIT_SECONDS` | `5` | Rate limit window |
 | `IMAGE_ENABLED` | `true` | Enable `/imagine` |
-| `IMAGE_MODEL` | `black-forest-labs/flux-3-image-klein` | OpenRouter image model |
+| `IMAGE_MODEL` | `black-forest-labs/flux.2-klein-4b` | OpenRouter image model |
 | `IMAGE_DEFAULT_RESOLUTION` | `1K` | Default image resolution |
 | `IMAGE_DEFAULT_ASPECT_RATIO` | `1:1` | Default image aspect ratio |
 | `IMAGE_SAFE_CHANNEL_TOLERANCE` | `2` | Safety tolerance used in normal channels |
-| `IMAGE_SAFETY_TOLERANCE` | `4` | Safety tolerance used in NSFW channels |
+| `IMAGE_SAFETY_TOLERANCE` | `5` | Safety tolerance used in NSFW channels |
 | `IMAGE_MAX_REFERENCE_MB` | `8` | Maximum reference image size |
 | `IMAGE_TIMEOUT_SECONDS` | `120` | Image generation timeout |
 | `IMAGE_RATE_LIMIT_PER_HOUR` | `5` | Image generations per user per hour |

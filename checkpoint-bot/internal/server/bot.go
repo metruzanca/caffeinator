@@ -342,7 +342,7 @@ func newImageClientFromConfig() *imagegen.Client {
 
 	model := strings.TrimSpace(viper.GetString("IMAGE_MODEL"))
 	if model == "" {
-		model = "black-forest-labs/flux-3-image-klein"
+		model = "black-forest-labs/flux.2-klein-4b"
 	}
 
 	baseURL := strings.TrimSpace(viper.GetString("OPENROUTER_BASE_URL"))

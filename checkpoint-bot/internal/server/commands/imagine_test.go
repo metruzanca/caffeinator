@@ -129,6 +129,10 @@ func TestResolveImageSafetyTolerance(t *testing.T) {
 	value, err = resolveImageSafetyTolerance(true, &tooLow, 2, 5, 4)
 	require.NoError(t, err)
 	require.Equal(t, 0, value)
+
+	value, err = resolveImageSafetyTolerance(true, &requested, 2, 5, 5)
+	require.NoError(t, err)
+	require.Equal(t, 5, value)
 }
 
 func TestMaxSafetyToleranceForModel(t *testing.T) {
@@ -136,6 +140,13 @@ func TestMaxSafetyToleranceForModel(t *testing.T) {
 	require.Equal(t, 4, maxSafetyToleranceForModel("black-forest-labs/flux-3-image"))
 	require.Equal(t, 5, maxSafetyToleranceForModel("black-forest-labs/flux.2-klein-4b"))
 	require.Equal(t, 5, maxSafetyToleranceForModel("some-other-model"))
+}
+
+func TestModelSupportsResolution(t *testing.T) {
+	require.True(t, modelSupportsResolution("black-forest-labs/flux-3-image-klein"))
+	require.False(t, modelSupportsResolution("black-forest-labs/flux.2-klein-4b"))
+	require.True(t, modelSupportsResolution("bytedance-seed/seedream-5-0-flash"))
+	require.False(t, modelSupportsResolution("some-other-model"))
 }
 
 func TestImageExtension(t *testing.T) {

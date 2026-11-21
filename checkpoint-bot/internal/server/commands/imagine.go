@@ -72,7 +72,8 @@ var ImagineCmd = &Command{
 					{Name: "1", Value: 1},
 					{Name: "2 default", Value: 2},
 					{Name: "3", Value: 3},
-					{Name: "4 most permissive", Value: 4},
+					{Name: "4", Value: 4},
+					{Name: "5 (Flux 2)", Value: 5},
 				},
 			},
 		},
@@ -135,6 +136,9 @@ var ImagineCmd = &Command{
 		if err != nil {
 			respondEphemeral(s, i, "Safety tolerance can only be changed in NSFW channels.")
 			return
+		}
+		if !modelSupportsResolution(h.ImageModel) {
+			resolution = ""
 		}
 
 		if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -371,6 +375,12 @@ func maxSafetyToleranceForModel(model string) int {
 		return 4
 	}
 	return 5
+}
+
+func modelSupportsResolution(model string) bool {
+	model = strings.ToLower(model)
+	return strings.HasPrefix(model, "black-forest-labs/flux-3") ||
+		strings.HasPrefix(model, "bytedance-seed/seedream")
 }
 
 func imageExtension(mediaType string) string {

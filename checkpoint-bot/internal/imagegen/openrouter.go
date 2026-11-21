@@ -15,7 +15,7 @@ import (
 
 const (
 	defaultBaseURL = "https://openrouter.ai/api/v1"
-	defaultModel   = "black-forest-labs/flux-3-image-klein"
+	defaultModel   = "black-forest-labs/flux.2-klein-4b"
 	maxBodyBytes   = 64 << 20
 )
 

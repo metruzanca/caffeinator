@@ -72,6 +72,35 @@ func TestGenerateBuildsRequest(t *testing.T) {
 	require.Equal(t, float64(4), got.Provider.Options["black-forest-labs"]["safety_tolerance"])
 }
 
+func TestGenerateFlux2AllowsTolerance5(t *testing.T) {
+	var got imageRequest
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Errorf("cannot decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"b64_json":"` + base64.StdEncoding.EncodeToString([]byte("image")) + `"}]}`))
+	}))
+	defer server.Close()
+
+	tolerance := 5
+	client := &Client{
+		APIKey:     "test-key",
+		Model:      "black-forest-labs/flux.2-klein-4b",
+		BaseURL:    server.URL,
+		HTTPClient: server.Client(),
+	}
+
+	_, err := client.Generate(context.Background(), Request{
+		Prompt:          "hello",
+		SafetyTolerance: &tolerance,
+	})
+	require.NoError(t, err)
+	require.NotNil(t, got.Provider)
+	require.Equal(t, float64(5), got.Provider.Options["black-forest-labs"]["safety_tolerance"])
+}
+
 func TestGenerateOmitsProviderOptionsForOtherModels(t *testing.T) {
 	var got imageRequest
 
