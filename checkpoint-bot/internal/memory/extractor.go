@@ -12,12 +12,15 @@ import (
 )
 
 // ExtractionSystemPrompt is the system prompt used to extract durable facts.
-const ExtractionSystemPrompt = `You extract durable facts about a Discord user from messages they wrote.
+const ExtractionSystemPrompt = `You extract durable facts from messages a Discord user wrote.
 Return JSON only, with this shape:
-{"facts":[{"subject_id":"...","fact":"...","category":"identity|work|preference|project|other","confidence":0.0}]}
-Only extract first-person facts that the speaker states about themselves.
+{"facts":[{"subject_id":"...","fact":"...","category":"identity|work|preference|project|server|other","confidence":0.0}]}
+Use only the subject IDs listed as allowed subjects.
+Extract first-person facts that the speaker states about themselves.
+When "server" is an allowed subject, also extract clear facts the speaker states about the server itself, using subject_id "server".
+Only store server facts that describe what the server is, who it is for, or how it is run.
 Ignore statements about other people, even if the speaker mentions them.
-Do not extract opinions, claims, or facts about other users.
+Do not extract opinions, jokes, complaints, or guesses about the server.
 Do not extract facts from other users' messages or from the bot.
 Do not extract secrets, credentials, tokens, addresses, health data, or other sensitive personal data.
 Do not extract transient plans or small talk.
@@ -67,6 +70,9 @@ func (e *Extractor) Extract(ctx context.Context, transcript string, subjects map
 
 	var builder strings.Builder
 	builder.WriteString("Allowed subjects:\n")
+	if _, ok := subjects["server"]; ok {
+		builder.WriteString("server: this Discord server\n")
+	}
 
 	ids := make([]string, 0, len(subjects))
 	for id := range subjects {

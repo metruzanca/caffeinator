@@ -215,7 +215,7 @@ func TestHandleIgnoresBots(t *testing.T) {
 
 	message := testMessage("1", "channel", "guild", "bot", "<@bot> hi")
 	message.Author.Bot = true
-	chat.handle(message, "bot")
+	chat.handle(message, "bot", false)
 
 	time.Sleep(20 * time.Millisecond)
 	require.Equal(t, 0, client.calls)
@@ -225,7 +225,7 @@ func TestHandleIgnoresIrrelevantMessages(t *testing.T) {
 	client := &fakeChatClient{called: make(chan []llm.Message, 1)}
 	chat := newChat(&fakeChatSession{}, client, ChatConfig{})
 
-	chat.handle(testMessage("1", "channel", "guild", "alice", "just chatting"), "bot")
+	chat.handle(testMessage("1", "channel", "guild", "alice", "just chatting"), "bot", false)
 
 	time.Sleep(20 * time.Millisecond)
 	require.Equal(t, 0, client.calls)
@@ -244,7 +244,7 @@ func TestHandleRespondsToMention(t *testing.T) {
 	}
 	chat := newChat(session, client, ChatConfig{ContextMessages: 10})
 
-	chat.handle(testMessage("2", "channel", "guild", "alice", "<@bot> what do you think?"), "bot")
+	chat.handle(testMessage("2", "channel", "guild", "alice", "<@bot> what do you think?"), "bot", false)
 
 	var sentMessages []llm.Message
 	select {
@@ -293,7 +293,7 @@ func TestHandleRespondsToReplyWithoutMention(t *testing.T) {
 	message := testMessage("2", "channel", "guild", "alice", "what about this?")
 	message.ReferencedMessage = referenced
 
-	chat.handle(message, "bot")
+	chat.handle(message, "bot", false)
 
 	var sentMessages []llm.Message
 	select {
@@ -342,7 +342,7 @@ func TestHandleFetchesReferencedMessage(t *testing.T) {
 		GuildID:   "guild",
 	}
 
-	chat.handle(message, "bot")
+	chat.handle(message, "bot", false)
 
 	select {
 	case sentMessages := <-client.called:
@@ -364,7 +364,7 @@ func TestHandleIgnoresReplyToOtherUserWithoutMention(t *testing.T) {
 		Author: &discordgo.User{ID: "bob"},
 	}
 
-	chat.handle(message, "bot")
+	chat.handle(message, "bot", false)
 
 	time.Sleep(20 * time.Millisecond)
 	require.Equal(t, 0, client.calls)
@@ -562,12 +562,110 @@ func TestExtractionSubjectsOnlySpeaker(t *testing.T) {
 	message := testMessage("1", "channel", "guild", "111", "remember that <@222> is an AI doomer")
 	message.Author.Username = "alice"
 
-	subjects := extractionSubjects(message, "bot")
+	subjects := extractionSubjects(message, "bot", false)
 
 	require.Len(t, subjects, 1)
 	require.Contains(t, subjects, "111")
 	require.NotContains(t, subjects, "222")
 	require.NotContains(t, subjects, "server")
+}
+
+func TestExtractionSubjectsIncludesServerForAdmins(t *testing.T) {
+	message := testMessage("1", "channel", "guild", "111", "remember that this server is for developers")
+	message.Author.Username = "alice"
+
+	subjects := extractionSubjects(message, "bot", true)
+
+	require.Len(t, subjects, 2)
+	require.Contains(t, subjects, "111")
+	require.Contains(t, subjects, "server")
+}
+
+func TestAdminRememberMentionStoresServerMemory(t *testing.T) {
+	store, err := memory.NewStore(t.TempDir(), 1000)
+	require.NoError(t, err)
+
+	extractor := &fakeExtractor{facts: []memory.Fact{{
+		SubjectID:   "server",
+		SubjectName: "server",
+		Text:        "The server is for developers.",
+		Category:    "server",
+		Confidence:  0.9,
+	}}}
+
+	session := &fakeChatSession{sentCh: make(chan *discordgo.MessageSend, 1)}
+	chat := newChat(session, &fakeChatClient{response: "Noted."}, ChatConfig{
+		ContextMessages: 10,
+		Memory:          store,
+		Extractor:       extractor,
+		PassiveMemory:   true,
+	})
+
+	chat.handle(testMessage("1", "channel", "guild", "111", "<@bot> remember that this server is for developers"), "bot", true)
+
+	require.Eventually(t, func() bool {
+		text, err := store.Get("server")
+		return err == nil && strings.Contains(text, "The server is for developers.")
+	}, time.Second, 10*time.Millisecond)
+}
+
+func TestNonAdminRememberMentionSkipsServerMemory(t *testing.T) {
+	store, err := memory.NewStore(t.TempDir(), 1000)
+	require.NoError(t, err)
+
+	extractor := &fakeExtractor{facts: []memory.Fact{{
+		SubjectID:   "server",
+		SubjectName: "server",
+		Text:        "The server is for developers.",
+		Category:    "server",
+		Confidence:  0.9,
+	}}}
+
+	session := &fakeChatSession{sentCh: make(chan *discordgo.MessageSend, 1)}
+	chat := newChat(session, &fakeChatClient{response: "Noted."}, ChatConfig{
+		ContextMessages: 10,
+		Memory:          store,
+		Extractor:       extractor,
+		PassiveMemory:   true,
+	})
+
+	chat.handle(testMessage("1", "channel", "guild", "111", "<@bot> remember that this server is for developers"), "bot", false)
+
+	time.Sleep(50 * time.Millisecond)
+	require.Equal(t, 0, extractor.calls)
+
+	text, err := store.Get("server")
+	require.NoError(t, err)
+	require.Empty(t, text)
+}
+
+func TestAdminMentionWithoutRememberSkipsExtraction(t *testing.T) {
+	store, err := memory.NewStore(t.TempDir(), 1000)
+	require.NoError(t, err)
+
+	extractor := &fakeExtractor{facts: []memory.Fact{{
+		SubjectID: "server",
+		Text:      "The server is for developers.",
+	}}}
+
+	session := &fakeChatSession{sentCh: make(chan *discordgo.MessageSend, 1)}
+	chat := newChat(session, &fakeChatClient{response: "It is for developers."}, ChatConfig{
+		ContextMessages: 10,
+		Memory:          store,
+		Extractor:       extractor,
+		PassiveMemory:   true,
+	})
+
+	chat.handle(testMessage("1", "channel", "guild", "111", "<@bot> what is this server about?"), "bot", true)
+
+	time.Sleep(50 * time.Millisecond)
+	require.Equal(t, 0, extractor.calls)
+}
+
+func TestWantsMemoryUpdate(t *testing.T) {
+	require.True(t, wantsMemoryUpdate("remember that this server is for developers"))
+	require.True(t, wantsMemoryUpdate("Please MEMORIZE this"))
+	require.False(t, wantsMemoryUpdate("what is this server about?"))
 }
 
 func TestBuildSelfTranscriptExcludesOtherUsers(t *testing.T) {

@@ -22,7 +22,10 @@ const (
 	maxTranscriptChars  = 8000
 )
 
-var userMentionPattern = regexp.MustCompile(`<@!?(\d+)>`)
+var (
+	userMentionPattern       = regexp.MustCompile(`<@!?(\d+)>`)
+	memoryInstructionPattern = regexp.MustCompile(`(?i)\b(remember|memorize|memorise)\b`)
+)
 
 type chatSession interface {
 	ChannelMessage(channelID, messageID string, options ...discordgo.RequestOption) (*discordgo.Message, error)
@@ -138,10 +141,14 @@ func (c *Chat) Handle(s *discordgo.Session, m *discordgo.MessageCreate) {
 	if s == nil || s.State == nil || s.State.User == nil {
 		return
 	}
-	c.handle(m, s.State.User.ID)
+	serverAdmin := false
+	if m != nil {
+		serverAdmin = isGuildAdmin(s, m.Message)
+	}
+	c.handle(m, s.State.User.ID, serverAdmin)
 }
 
-func (c *Chat) handle(m *discordgo.MessageCreate, botID string) {
+func (c *Chat) handle(m *discordgo.MessageCreate, botID string, serverAdmin bool) {
 	if m == nil || m.Message == nil || m.Author == nil || m.Author.Bot {
 		return
 	}
@@ -166,10 +173,10 @@ func (c *Chat) handle(m *discordgo.MessageCreate, botID string) {
 		return
 	}
 
-	go c.respond(m, referenced, mentioned, botID)
+	go c.respond(m, referenced, mentioned, botID, serverAdmin)
 }
 
-func (c *Chat) respond(m *discordgo.MessageCreate, referenced *discordgo.Message, mentioned bool, botID string) {
+func (c *Chat) respond(m *discordgo.MessageCreate, referenced *discordgo.Message, mentioned bool, botID string, serverAdmin bool) {
 	prompt := cleanContent(m, botID, mentioned)
 	if prompt == "" && len(m.Attachments) == 0 {
 		c.send(m, "What's up?")
@@ -179,7 +186,8 @@ func (c *Chat) respond(m *discordgo.MessageCreate, referenced *discordgo.Message
 	stopTyping := c.startTyping(m.ChannelID)
 	defer stopTyping()
 
-	content, err := c.generate(context.Background(), m, referenced, c.cfg.ContextMessages, true, !c.cfg.PassiveMemory, botID, prompt)
+	extractMemory := !c.cfg.PassiveMemory || (serverAdmin && wantsMemoryUpdate(prompt))
+	content, err := c.generate(context.Background(), m, referenced, c.cfg.ContextMessages, true, extractMemory, serverAdmin, botID, prompt)
 	if err != nil {
 		log.Error("chat request failed",
 			"err", err,
@@ -225,10 +233,10 @@ func (c *Chat) Ask(ctx context.Context, req commands.ChatRequest) (string, error
 		Content:   text,
 	}}
 
-	return c.generate(ctx, message, nil, historyLength, !req.DisableMemory, true, req.BotID, text)
+	return c.generate(ctx, message, nil, historyLength, !req.DisableMemory, true, false, req.BotID, text)
 }
 
-func (c *Chat) generate(ctx context.Context, m *discordgo.MessageCreate, referenced *discordgo.Message, historyLength int, useMemory, extractMemory bool, botID, prompt string) (string, error) {
+func (c *Chat) generate(ctx context.Context, m *discordgo.MessageCreate, referenced *discordgo.Message, historyLength int, useMemory, extractMemory, canWriteServer bool, botID, prompt string) (string, error) {
 	select {
 	case c.sem <- struct{}{}:
 		defer func() { <-c.sem }()
@@ -301,7 +309,7 @@ func (c *Chat) generate(ctx context.Context, m *discordgo.MessageCreate, referen
 	)
 
 	if extractMemory && useMemory && c.memory != nil && c.extractor != nil {
-		subjects := extractionSubjects(m, botID)
+		subjects := extractionSubjects(m, botID, canWriteServer)
 		if len(subjects) > 0 {
 			transcript := buildSelfTranscript(history, m, prompt)
 			go c.extractMemory(transcript, subjects)
@@ -567,8 +575,8 @@ func collectSubjects(m *discordgo.MessageCreate, referenced *discordgo.Message, 
 	return subjects
 }
 
-func extractionSubjects(m *discordgo.MessageCreate, botID string) map[string]string {
-	subjects := make(map[string]string, 1)
+func extractionSubjects(m *discordgo.MessageCreate, botID string, canWriteServer bool) map[string]string {
+	subjects := make(map[string]string, 2)
 	if m == nil || m.Author == nil {
 		return subjects
 	}
@@ -576,7 +584,51 @@ func extractionSubjects(m *discordgo.MessageCreate, botID string) map[string]str
 		return subjects
 	}
 	subjects[m.Author.ID] = displayName(m.Author)
+	if canWriteServer {
+		subjects["server"] = "server"
+	}
 	return subjects
+}
+
+// wantsMemoryUpdate reports whether a message explicitly asks the bot to
+// remember something. Server memory writes require an explicit request so
+// ordinary admin chatter does not become server facts.
+func wantsMemoryUpdate(text string) bool {
+	return memoryInstructionPattern.MatchString(text)
+}
+
+// isGuildAdmin reports whether the message author is an administrator or the
+// guild owner. It fails closed so a cold cache never grants server memory
+// writes.
+func isGuildAdmin(s *discordgo.Session, m *discordgo.Message) bool {
+	if s == nil || m == nil || m.Author == nil || m.GuildID == "" {
+		return false
+	}
+	if s.State != nil {
+		if perms, err := s.State.MessagePermissions(m); err == nil {
+			return perms&discordgo.PermissionAdministrator != 0
+		}
+	}
+
+	member, err := s.GuildMember(m.GuildID, m.Author.ID)
+	if err != nil || member == nil {
+		return false
+	}
+	guild, err := s.Guild(m.GuildID)
+	if err != nil || guild == nil {
+		return false
+	}
+	if guild.OwnerID == m.Author.ID {
+		return true
+	}
+	for _, roleID := range member.Roles {
+		for _, role := range guild.Roles {
+			if role.ID == roleID && role.Permissions&discordgo.PermissionAdministrator != 0 {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func buildSelfTranscript(history []*discordgo.Message, current *discordgo.MessageCreate, prompt string) string {

@@ -12,9 +12,13 @@ import (
 type fakeExtractionClient struct {
 	response string
 	err      error
+	got      string
 }
 
 func (f *fakeExtractionClient) Chat(ctx context.Context, messages []llm.Message) (string, llm.Usage, error) {
+	if len(messages) > 0 {
+		f.got = messages[0].Content
+	}
 	if f.err != nil {
 		return "", llm.Usage{}, f.err
 	}
@@ -41,6 +45,20 @@ func TestExtractorParsesFacts(t *testing.T) {
 	require.Equal(t, "Alice", facts[0].SubjectName)
 	require.Equal(t, "work", facts[0].Category)
 	require.Equal(t, "server", facts[1].SubjectID)
+
+	require.Contains(t, client.got, "server: this Discord server")
+	require.Contains(t, client.got, "123: Alice")
+}
+
+func TestExtractorOmitsServerWhenNotAllowed(t *testing.T) {
+	client := &fakeExtractionClient{response: `{"facts":[]}`}
+	extractor := NewExtractor(client, 0.7)
+
+	_, err := extractor.Extract(context.Background(), "alice (123): hello", map[string]string{
+		"123": "Alice",
+	})
+	require.NoError(t, err)
+	require.NotContains(t, client.got, "this Discord server")
 }
 
 func TestExtractorFiltersFacts(t *testing.T) {
