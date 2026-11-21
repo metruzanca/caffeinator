@@ -6,6 +6,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/charmbracelet/log"
+	"github.com/metruzanca/checkpoint-bot/internal/imagegen"
 	"github.com/metruzanca/checkpoint-bot/internal/ratelimit"
 )
 
@@ -37,11 +38,23 @@ type MemoryService interface {
 	ListUsers() ([]string, error)
 }
 
+// ImageService generates images through OpenRouter.
+type ImageService interface {
+	Generate(ctx context.Context, req imagegen.Request) (imagegen.Result, error)
+}
+
 // CommandHandler manages Discord slash command registration and execution.
 type CommandHandler struct {
-	DiscordClient *discordgo.Session
-	Chat          ChatService
-	Memory        MemoryService
+	DiscordClient          *discordgo.Session
+	Chat                   ChatService
+	Memory                 MemoryService
+	Images                 ImageService
+	ImageLimiter           *ratelimit.Limiter
+	ImageModel             string
+	ImageResolution        string
+	ImageAspectRatio       string
+	ImageMaxReferenceBytes int64
+	ImageTimeout           time.Duration
 }
 
 // Command represents a Discord slash command with its handler function.

@@ -30,6 +30,7 @@ Checkpoint and goal tracking were removed. If that feature comes back, it will s
 | Command | Description |
 |---|---|
 | `/link url:<url>` | Rewrites X/Twitter links to `fxtwitter.com` and Instagram links to `kkinstagram.com`, and removes tracking query parameters. |
+| `/imagine prompt:<text> [image] [aspect_ratio] [resolution]` | Generates an image. Attach a reference image to edit or restyle it. |
 | `/ask text:<text> [history_length] [disable_memory]` | Runs the same chat pipeline as a mention. `history_length` defaults to 10 and can go up to 100. Set `disable_memory` to skip memory reads and writes for that ask. Responses are public. |
 | `/memory view\|forget\|list` | View or forget memory. Everyone can manage their own memory. Admins can target other users or server memory and list users. Responses are ephemeral. |
 
@@ -44,6 +45,34 @@ Examples:
 ```
 
 The rewritten link is posted publicly so everyone can click or preview it.
+
+---
+
+## Image generation
+
+`/imagine` generates images through OpenRouter using `bytedance-seed/seedream-5-0-flash` by default.
+
+```text
+/imagine prompt:a red panda astronaut, studio lighting
+/imagine prompt:turn this into a watercolor painting image:<attachment>
+```
+
+Options:
+
+- `image` is an optional reference image for editing or style transfer.
+- `aspect_ratio` supports `1:1`, `16:9`, `9:16`, `4:3`, `3:4`, `3:2`, `2:3`, and `auto`.
+- `resolution` supports `1K`, `1.5K`, and `2K`.
+
+Defaults:
+
+- Resolution `1K`
+- Aspect ratio `1:1`
+- One image per request
+- Five generations per user per hour
+
+Reference images are downloaded from Discord, converted to base64, and sent to OpenRouter. PNG, JPEG, and WebP are accepted. The default limit is 8 MB.
+
+Image generation is billed per image by OpenRouter, not by tokens. Seedream 5.0 Flash costs about $0.018 per image at the time of writing.
 
 ---
 
@@ -206,6 +235,7 @@ For local development, the default is `./memory`.
    - Send Messages
    - Send Messages in Threads
    - Read Message History
+   - Attach Files
 
 The generated invite link requests exactly these permissions and includes the `bot` and `applications.commands` scopes.
 
@@ -237,6 +267,13 @@ Copy `.env.example` to `.env` and fill it in, or set the same variables in your 
 | `CHAT_MAX_CONCURRENT` | `4` | Concurrent model requests |
 | `CHAT_RATE_LIMIT_CAPACITY` | `1` | Requests allowed per user per window |
 | `CHAT_RATE_LIMIT_SECONDS` | `5` | Rate limit window |
+| `IMAGE_ENABLED` | `true` | Enable `/imagine` |
+| `IMAGE_MODEL` | `bytedance-seed/seedream-5-0-flash` | OpenRouter image model |
+| `IMAGE_DEFAULT_RESOLUTION` | `1K` | Default image resolution |
+| `IMAGE_DEFAULT_ASPECT_RATIO` | `1:1` | Default image aspect ratio |
+| `IMAGE_MAX_REFERENCE_MB` | `8` | Maximum reference image size |
+| `IMAGE_TIMEOUT_SECONDS` | `120` | Image generation timeout |
+| `IMAGE_RATE_LIMIT_PER_HOUR` | `5` | Image generations per user per hour |
 | `MEMORY_ENABLED` | `true` | Enable markdown memory |
 | `MEMORY_DIR` | `./memory` | Memory directory. Use `/data/memory` with a Railway volume |
 | `MEMORY_MAX_CONTEXT_CHARS` | `3000` | Maximum memory characters injected into a chat request |
@@ -303,7 +340,8 @@ checkpoint-bot/
 ├── cmd/                       # CLI commands (run, invite, command clear)
 ├── internal/
 │   ├── config/                # Viper and dotenv configuration
-│   ├── llm/                   # OpenRouter client
+│   ├── imagegen/              # OpenRouter image generation client
+│   ├── llm/                   # OpenRouter chat client
 │   ├── memory/                # Markdown memory store and extraction
 │   ├── ratelimit/             # Shared token bucket limiter
 │   ├── server/                # Bot lifecycle and chat pipeline
@@ -326,7 +364,7 @@ go test ./...
 go vet ./...
 ```
 
-The suite covers link rewriting, context assembly, mention detection, `/ask`, memory storage and extraction, response chunking, rate limiting, and the OpenRouter client (with `httptest`, no live API calls).
+The suite covers link rewriting, context assembly, mention detection, `/ask`, memory storage and extraction, image generation request/response handling, response chunking, rate limiting, and the OpenRouter clients (with `httptest`, no live API calls).
 
 ### Logging
 
