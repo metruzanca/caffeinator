@@ -75,6 +75,9 @@ func (c *passiveCollector) Handle(s *discordgo.Session, m *discordgo.MessageCrea
 	if m == nil || m.Message == nil || m.Author == nil || m.Author.Bot {
 		return
 	}
+	if m.WebhookID != "" {
+		return
+	}
 	if m.GuildID == "" || m.Author.ID == s.State.User.ID || !isDigits(m.Author.ID) {
 		return
 	}
