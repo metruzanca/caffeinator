@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/charmbracelet/log"
@@ -20,6 +21,10 @@ var rootCmd = &cobra.Command{
 		token := viper.GetString("TOKEN")
 		if token == "" {
 			log.Fatal("TOKEN is required")
+		}
+
+		if strings.TrimSpace(viper.GetString("OPENROUTER_API_KEY")) == "" {
+			log.Fatal("OPENROUTER_API_KEY is required")
 		}
 
 		log.Info("starting bot")
