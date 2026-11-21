@@ -174,11 +174,14 @@ How it works:
 
 - Passive messages are batched per author every 60 seconds by default.
 - A background model call extracts high-confidence facts from that author's own messages.
-- It only stores first-person facts that people state about themselves.
+- It stores first-person facts that people state about themselves.
+- Admins can teach it facts about the server with an explicit instruction in a mention or reply, for example `@Caffeinator remember that this server is for developers`.
+- Server memory writes need an Administrator or owner account. Other members are told that only admins can change server memory.
 - Claims about other users are ignored, even if the speaker mentions them.
 - It does not learn from other users' messages or from the bot's own replies.
 - Facts are deduplicated, filtered for sensitive data, and appended to the markdown files.
-- Server memory is not written automatically. Admins can view and edit it manually.
+- Server memory is shared: it is loaded into every chat request.
+- Admins can also edit `memory/server.md` by hand.
 - Memory is automatic. The model does not need a memory write tool and does not need to be mentioned.
 - `disable_memory` on `/ask` skips both reads and writes for that ask.
 - `MEMORY_PASSIVE_ENABLED=false` disables passive learning.

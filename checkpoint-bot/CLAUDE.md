@@ -176,7 +176,7 @@ Context rules:
 - Other messages become `user` turns prefixed with the author's display name.
 - Images from the current message and the replied-to message are attached as image content parts. Older context images are not sent.
 - A system prompt tells the bot its stack: Go, discordgo, Railway, OpenRouter, and DeepSeek V4.1 Flash 1017.
-- It also tells the bot that memory is automatic, tool-free, does not require a mention, and is limited to facts people share about themselves. It must not claim it cannot remember between sessions.
+- It also tells the bot that memory is automatic, tool-free, does not require a mention, and covers facts people share about themselves plus admin-taught server facts. It must not claim it cannot remember between sessions, and it must not claim a write it cannot store.
 - It requires inline Discord markdown citations for web search results, using short relevant phrases as link text and at most two citations by default.
 - It requires Discord mention and timestamp formatting: `<@id>`, `<#id>`, and `<t:unix:R>`.
 - It makes replies peer-like: casual, direct, and free of unsolicited remediation.
@@ -246,6 +246,9 @@ Write path:
 - Batch messages per author every `MEMORY_BATCH_SECONDS`.
 - Use only that author's own messages as the transcript.
 - Extract only first-person facts that the speaker states about themselves.
+- Also extract clear facts the speaker states about the server, using subject ID `server`.
+- Server writes require an Administrator or guild owner and an explicit remember instruction in the message.
+- Gate server writes with `isGuildAdmin` and fail closed when permissions cannot be resolved.
 - Ignore statements about other people, even when the speaker mentions them.
 - Ignore bot messages, other bots, and other users' messages.
 - Never write facts about another user based on what someone else said.
@@ -255,14 +258,14 @@ Write path:
 - Deduplicate against existing markdown.
 - Write atomically with a temporary file and rename.
 - Use JSON response format and enough output tokens to avoid truncated JSON.
-- Do not auto-write server memory. Server memory is manual/admin-managed.
+- Server memory is admin-managed: explicit admin remember instructions plus manual edits.
 - When passive memory is enabled, mention and reply chat skips its own extraction to avoid duplicate calls. `/ask` still extracts because it has no message event.
 
 Rules:
 
 - Memory is enabled for normal messages when `MEMORY_PASSIVE_ENABLED=true`.
 - `disable_memory` on `/ask` skips reads and writes.
-- The system prompt must say memory is automatic and self-only, and that no memory tool is needed.
+- The system prompt must say memory is automatic, covers self facts and admin-taught server facts, and needs no memory tool.
 - `/memory view` and `/memory forget` work on the invoker's own memory by default.
 - Admins can target another user with `user:@someone` or server memory with `server:true`.
 - `/memory forget fact:<text>` removes matching entries. `/memory forget all:true` clears the target.
