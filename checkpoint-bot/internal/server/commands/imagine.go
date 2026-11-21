@@ -103,9 +103,12 @@ var ImagineCmd = &Command{
 		}
 
 		if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "Caffeinator is drawing...",
+			},
 		}); err != nil {
-			log.Error("cannot defer imagine interaction", "err", err, "channel", i.ChannelID)
+			log.Error("cannot acknowledge imagine interaction", "err", err, "channel", i.ChannelID)
 			return
 		}
 
