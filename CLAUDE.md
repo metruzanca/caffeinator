@@ -114,6 +114,7 @@ Lifecycle:
 - Commands are registered per guild.
 - `clearUnregisteredCommands` deletes commands that exist in Discord but not in the current build.
 - Commands are rate limited per user by `commandRateLimiter`.
+- Use `{bot}` in a description when it should include `BOT_NAME`. `resolveDescription` fills it in at registration time.
 
 Handler rules:
 
@@ -187,7 +188,9 @@ Context rules:
 - It makes replies peer-like: casual, direct, and free of unsolicited remediation.
 - It bans em dashes and asks for short, simple sentences.
 - It also limits replies to a single tweet (280 characters) unless the user asks for more detail.
+- The default prompt is a template. `{{bot}}` becomes `BOT_NAME`, `{{community}}` becomes `COMMUNITY_NAME`, and `{{model}}` becomes `OPENROUTER_MODEL`.
 - The system prompt can be overridden with `CHAT_SYSTEM_PROMPT`.
+- Do not hardcode The Coffee Break in new prompts or user-facing text.
 
 Response rules:
 
@@ -336,6 +339,9 @@ Configuration uses Viper and dotenv.
 
 - Defaults and CLI flags live in `cmd/root.go`.
 - Environment variables override defaults.
+- `BOT_NAME` and `COMMUNITY_NAME` control branding. Defaults are `Caffeinator` and `The Coffee Break`. `internal/config/branding.go` provides the helpers.
+- The Discord username and avatar are set in the Discord Developer Portal, not by env vars.
+- `OPENROUTER_APP_URL` sets the referer sent to OpenRouter for attribution.
 - `OPENROUTER_API_KEY` is environment-only and should never be added as a flag.
 - `.env` is gitignored. Keep `.env.example` current.
 - If the OpenRouter key is empty, mention chat is disabled and `/link` still works.

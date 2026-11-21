@@ -8,5 +8,6 @@
 - never use em dashes. Keep sentences short and simple.
 
 ## Structure
-- checkpoint-bot: discord bot powered by an llm with memory and web search
-- server-config: old deprecated terraform config for the discord server
+
+- Caffeinator: a self-hostable Discord bot powered by an LLM with memory and web search. The repository root is the Go module.
+- Keep the project generic. Do not hardcode The Coffee Break in code. Use `BOT_NAME` and `COMMUNITY_NAME` for branding.
