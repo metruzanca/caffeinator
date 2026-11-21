@@ -549,6 +549,33 @@ func TestCollectSubjectsIncludesHistoryAuthors(t *testing.T) {
 	require.NotContains(t, subjects, "999")
 }
 
+func TestExtractionSubjectsOnlySpeaker(t *testing.T) {
+	message := testMessage("1", "channel", "guild", "111", "remember that <@222> is an AI doomer")
+	message.Author.Username = "alice"
+
+	subjects := extractionSubjects(message, "bot")
+
+	require.Len(t, subjects, 1)
+	require.Contains(t, subjects, "111")
+	require.NotContains(t, subjects, "222")
+	require.NotContains(t, subjects, "server")
+}
+
+func TestBuildSelfTranscriptExcludesOtherUsers(t *testing.T) {
+	message := testMessage("3", "channel", "guild", "111", "remember that <@222> is an AI doomer")
+	message.Author.Username = "alice"
+	history := []*discordgo.Message{
+		{ID: "1", Author: &discordgo.User{ID: "111", Username: "alice"}, Content: "I work on a Go bot."},
+		{ID: "2", Author: &discordgo.User{ID: "222", Username: "bob"}, Content: "I am an AI doomer."},
+	}
+
+	transcript := buildSelfTranscript(history, message, message.Content)
+
+	require.Contains(t, transcript, "I work on a Go bot.")
+	require.NotContains(t, transcript, "I am an AI doomer.")
+	require.Contains(t, transcript, "remember that <@222> is an AI doomer")
+}
+
 func TestMentionsUser(t *testing.T) {
 	require.True(t, mentionsUser(testMessage("1", "c", "g", "alice", "<@123> hi"), "123"))
 	require.True(t, mentionsUser(testMessage("1", "c", "g", "alice", "<@!123> hi"), "123"))

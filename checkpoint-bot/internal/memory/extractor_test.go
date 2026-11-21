@@ -61,6 +61,21 @@ func TestExtractorFiltersFacts(t *testing.T) {
 	require.Equal(t, "Valid fact.", facts[0].Text)
 }
 
+func TestExtractorRejectsServerWhenNotAllowed(t *testing.T) {
+	client := &fakeExtractionClient{response: `{
+		"facts": [
+			{"subject_id": "server", "fact": "The server is for developers.", "category": "server", "confidence": 0.9}
+		]
+	}`}
+	extractor := NewExtractor(client, 0.7)
+
+	facts, err := extractor.Extract(context.Background(), "alice (123): hello", map[string]string{
+		"123": "Alice",
+	})
+	require.NoError(t, err)
+	require.Empty(t, facts)
+}
+
 func TestExtractorRejectsInvalidJSON(t *testing.T) {
 	client := &fakeExtractionClient{response: "not json"}
 	extractor := NewExtractor(client, 0.7)

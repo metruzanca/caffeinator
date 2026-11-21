@@ -280,9 +280,11 @@ func (c *Chat) generate(ctx context.Context, m *discordgo.MessageCreate, referen
 	)
 
 	if useMemory && c.memory != nil && c.extractor != nil {
-		transcript := buildTranscript(history, m, prompt, botID)
-		extractionSubjects := collectSubjects(m, referenced, prompt, botID, history)
-		go c.extractMemory(transcript, extractionSubjects)
+		subjects := extractionSubjects(m, botID)
+		if len(subjects) > 0 {
+			transcript := buildSelfTranscript(history, m, prompt)
+			go c.extractMemory(transcript, subjects)
+		}
 	}
 
 	return content, nil
@@ -544,11 +546,23 @@ func collectSubjects(m *discordgo.MessageCreate, referenced *discordgo.Message, 
 	return subjects
 }
 
-func buildTranscript(history []*discordgo.Message, current *discordgo.MessageCreate, prompt, botID string) string {
+func extractionSubjects(m *discordgo.MessageCreate, botID string) map[string]string {
+	subjects := make(map[string]string, 1)
+	if m == nil || m.Author == nil {
+		return subjects
+	}
+	if m.Author.ID == "" || m.Author.ID == botID || m.Author.Bot || !isDigits(m.Author.ID) {
+		return subjects
+	}
+	subjects[m.Author.ID] = displayName(m.Author)
+	return subjects
+}
+
+func buildSelfTranscript(history []*discordgo.Message, current *discordgo.MessageCreate, prompt string) string {
 	var builder strings.Builder
 
 	for _, message := range history {
-		if message == nil || message.Author == nil || message.Author.ID == botID || message.Author.Bot || message.ID == current.ID {
+		if message == nil || message.Author == nil || message.Author.ID != current.Author.ID || message.Author.Bot || message.ID == current.ID {
 			continue
 		}
 		text := messageText(message)

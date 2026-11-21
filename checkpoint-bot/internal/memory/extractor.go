@@ -12,10 +12,16 @@ import (
 )
 
 // ExtractionSystemPrompt is the system prompt used to extract durable facts.
-const ExtractionSystemPrompt = `You extract durable facts about Discord users and this server from conversations.
+const ExtractionSystemPrompt = `You extract durable facts about a Discord user from messages they wrote.
 Return JSON only, with this shape:
-{"facts":[{"subject_id":"...","fact":"...","category":"identity|work|preference|project|server|other","confidence":0.0}]}
-Only extract facts explicitly stated by users. Do not extract facts from the bot. Do not extract secrets, credentials, tokens, addresses, health data, or other sensitive personal data. Do not extract transient plans or small talk. If nothing is worth remembering, return {"facts":[]}.`
+{"facts":[{"subject_id":"...","fact":"...","category":"identity|work|preference|project|other","confidence":0.0}]}
+Only extract first-person facts that the speaker states about themselves.
+Ignore statements about other people, even if the speaker mentions them.
+Do not extract opinions, claims, or facts about other users.
+Do not extract facts from other users' messages or from the bot.
+Do not extract secrets, credentials, tokens, addresses, health data, or other sensitive personal data.
+Do not extract transient plans or small talk.
+If nothing is worth remembering, return {"facts":[]}.`
 
 // ChatClient is the small LLM surface needed by the extractor.
 type ChatClient interface {
@@ -61,7 +67,6 @@ func (e *Extractor) Extract(ctx context.Context, transcript string, subjects map
 
 	var builder strings.Builder
 	builder.WriteString("Allowed subjects:\n")
-	builder.WriteString("server: server\n")
 
 	ids := make([]string, 0, len(subjects))
 	for id := range subjects {
@@ -112,10 +117,8 @@ func (e *Extractor) parse(content string, subjects map[string]string) ([]Fact, e
 		}
 
 		subjectID := strings.TrimSpace(item.SubjectID)
-		if subjectID != "server" {
-			if _, ok := subjects[subjectID]; !ok {
-				continue
-			}
+		if _, ok := subjects[subjectID]; !ok {
+			continue
 		}
 		if item.Confidence < e.minConfidence {
 			continue

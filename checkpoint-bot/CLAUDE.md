@@ -173,7 +173,7 @@ Context rules:
 - Bot messages become `assistant` turns.
 - Other messages become `user` turns prefixed with the author's display name.
 - A system prompt tells the bot its stack: Go, discordgo, Railway, OpenRouter, and DeepSeek V4.1 Flash 1017.
-- It also tells the bot it has persistent markdown memory and must not claim it cannot remember between sessions.
+- It also tells the bot that memory is automatic, tool-free, and limited to facts people share about themselves. It must not claim it cannot remember between sessions.
 - It makes replies peer-like: casual, direct, and free of unsolicited remediation.
 - It bans em dashes and asks for short, simple sentences.
 - It also limits replies to a single tweet (280 characters) unless the user asks for more detail.
@@ -205,19 +205,24 @@ Read path:
 Write path:
 
 - After a reply, run a background extraction call.
-- Extract only durable facts stated by users.
-- Ignore bot messages and other bots.
+- Use only the invoking user's own messages as the transcript.
+- Extract only first-person facts that the speaker states about themselves.
+- Ignore statements about other people, even when the speaker mentions them.
+- Ignore bot messages, other bots, and other users' messages.
+- Never write facts about another user based on what someone else said.
 - Filter out secrets, credentials, addresses, health data, and sensitive personal data.
 - Filter by `MEMORY_MIN_CONFIDENCE`.
 - Deduplicate against existing markdown.
 - Write atomically with a temporary file and rename.
 - Use JSON response format and enough output tokens to avoid truncated JSON.
+- Do not auto-write server memory. Server memory is manual/admin-managed.
 
 Rules:
 
 - Memory is enabled only for invoked conversations.
 - `disable_memory` on `/ask` skips reads and writes.
 - The bot must never scan normal channel traffic.
+- The system prompt must say memory is automatic and self-only, and that no memory tool is needed.
 - `/memory view` and `/memory forget` work on the invoker's own memory by default.
 - Admins can target another user with `user:@someone` or server memory with `server:true`.
 - `/memory forget fact:<text>` removes matching entries. `/memory forget all:true` clears the target.

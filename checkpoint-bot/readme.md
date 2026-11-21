@@ -126,9 +126,13 @@ Each user file is human-readable and can be edited by hand. Example:
 How it works:
 
 - Before replying, the bot loads the invoking user's memory and server memory.
-- After replying, a background model call extracts high-confidence facts from the conversation.
+- After replying, a background model call extracts high-confidence facts from the invoking user's own messages.
+- It only stores first-person facts that people state about themselves.
+- Claims about other users are ignored, even if the speaker mentions them.
+- It does not learn from other users' messages or from the bot's own replies.
 - Facts are deduplicated, filtered for sensitive data, and appended to the markdown files.
-- The bot does not learn from its own replies.
+- Server memory is not written automatically. Admins can view and edit it manually.
+- Memory is automatic. The model does not need a memory write tool.
 - `disable_memory` on `/ask` skips both reads and writes for that ask.
 
 Memory commands:
