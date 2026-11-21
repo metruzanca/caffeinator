@@ -252,7 +252,8 @@ Location: `internal/imagegen/` and `internal/server/commands/imagine.go`
 - Never log full prompts or image bytes.
 - Black Forest Labs `safety_tolerance` is passed through `provider.options`.
 - Normal channels always use `IMAGE_SAFE_CHANNEL_TOLERANCE`, default `2`.
-- NSFW channels use `IMAGE_SAFETY_TOLERANCE`, default `5`.
+- NSFW channels use `IMAGE_SAFETY_TOLERANCE`, default `4`.
+- Flux 3 Image allows `0-4`. Flux 2 allows `0-5`. Sending above the model max returns 422.
 - Reject an explicit `safety_tolerance` in a normal channel.
 - Check the parent channel for threads.
 - Higher tolerance does not allow illegal content.

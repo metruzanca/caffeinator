@@ -95,36 +95,47 @@ func TestImageGenerationErrorMessage(t *testing.T) {
 	require.Equal(t, "The image provider blocked that prompt.", imageGenerationErrorMessage(other, false))
 	require.Contains(t, imageGenerationErrorMessage(other, true), "violated the content policy")
 
+	provider := &imagegen.ProviderError{Reason: "submit returned 422", StatusCode: 422}
+	require.Equal(t, "Image generation failed. Try again in a bit.", imageGenerationErrorMessage(provider, false))
+	require.Contains(t, imageGenerationErrorMessage(provider, true), "submit returned 422")
+
 	require.Equal(t, "Image generation failed. Try again in a bit.", imageGenerationErrorMessage(errors.New("boom"), false))
 }
 
 func TestResolveImageSafetyTolerance(t *testing.T) {
 	requested := 5
 
-	value, err := resolveImageSafetyTolerance(false, nil, 2, 5)
+	value, err := resolveImageSafetyTolerance(false, nil, 2, 5, 4)
 	require.NoError(t, err)
 	require.Equal(t, 2, value)
 
-	value, err = resolveImageSafetyTolerance(true, nil, 2, 5)
+	value, err = resolveImageSafetyTolerance(true, nil, 2, 5, 4)
 	require.NoError(t, err)
-	require.Equal(t, 5, value)
+	require.Equal(t, 4, value)
 
-	value, err = resolveImageSafetyTolerance(true, &requested, 2, 5)
+	value, err = resolveImageSafetyTolerance(true, &requested, 2, 5, 4)
 	require.NoError(t, err)
-	require.Equal(t, 5, value)
+	require.Equal(t, 4, value)
 
-	_, err = resolveImageSafetyTolerance(false, &requested, 2, 5)
+	_, err = resolveImageSafetyTolerance(false, &requested, 2, 5, 4)
 	require.Error(t, err)
 
 	tooHigh := 9
-	value, err = resolveImageSafetyTolerance(true, &tooHigh, 2, 5)
+	value, err = resolveImageSafetyTolerance(true, &tooHigh, 2, 5, 4)
 	require.NoError(t, err)
-	require.Equal(t, 5, value)
+	require.Equal(t, 4, value)
 
 	tooLow := -1
-	value, err = resolveImageSafetyTolerance(true, &tooLow, 2, 5)
+	value, err = resolveImageSafetyTolerance(true, &tooLow, 2, 5, 4)
 	require.NoError(t, err)
 	require.Equal(t, 0, value)
+}
+
+func TestMaxSafetyToleranceForModel(t *testing.T) {
+	require.Equal(t, 4, maxSafetyToleranceForModel("black-forest-labs/flux-3-image-klein"))
+	require.Equal(t, 4, maxSafetyToleranceForModel("black-forest-labs/flux-3-image"))
+	require.Equal(t, 5, maxSafetyToleranceForModel("black-forest-labs/flux.2-klein-4b"))
+	require.Equal(t, 5, maxSafetyToleranceForModel("some-other-model"))
 }
 
 func TestImageExtension(t *testing.T) {

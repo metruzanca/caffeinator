@@ -49,6 +49,19 @@ func (e *ContentBlockedError) Unwrap() error {
 	return ErrContentBlocked
 }
 
+// ProviderError describes a non-moderation provider rejection.
+type ProviderError struct {
+	Reason     string
+	StatusCode int
+}
+
+func (e *ProviderError) Error() string {
+	if strings.TrimSpace(e.Reason) == "" {
+		return fmt.Sprintf("image provider returned status %d", e.StatusCode)
+	}
+	return fmt.Sprintf("openrouter image: %s (status %d)", e.Reason, e.StatusCode)
+}
+
 // Request describes one image generation request.
 type Request struct {
 	Prompt           string
@@ -148,11 +161,15 @@ func (c *Client) Generate(ctx context.Context, req Request) (Result, error) {
 	}
 	if req.SafetyTolerance != nil && strings.HasPrefix(strings.ToLower(model), "black-forest-labs/") {
 		tolerance := *req.SafetyTolerance
+		maxTolerance := 5
+		if strings.HasPrefix(strings.ToLower(model), "black-forest-labs/flux-3") {
+			maxTolerance = 4
+		}
 		if tolerance < 0 {
 			tolerance = 0
 		}
-		if tolerance > 5 {
-			tolerance = 5
+		if tolerance > maxTolerance {
+			tolerance = maxTolerance
 		}
 		body.Provider = &providerOptions{
 			Options: map[string]map[string]any{
@@ -211,10 +228,10 @@ func (c *Client) Generate(ctx context.Context, req Request) (Result, error) {
 			}
 		}
 
-		if apiErr.Error != nil && apiErr.Error.Message != "" {
-			return Result{}, fmt.Errorf("openrouter image: %s (status %d)", apiErr.Error.Message, resp.StatusCode)
+		return Result{}, &ProviderError{
+			Reason:     message,
+			StatusCode: resp.StatusCode,
 		}
-		return Result{}, fmt.Errorf("openrouter image: status %d: %s", resp.StatusCode, message)
 	}
 
 	var parsed imageResponse

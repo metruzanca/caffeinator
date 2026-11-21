@@ -69,7 +69,7 @@ func TestGenerateBuildsRequest(t *testing.T) {
 	require.Equal(t, "image_url", got.InputReferences[0].Type)
 	require.Equal(t, "data:image/png;base64,abc", got.InputReferences[0].ImageURL.URL)
 	require.NotNil(t, got.Provider)
-	require.Equal(t, float64(5), got.Provider.Options["black-forest-labs"]["safety_tolerance"])
+	require.Equal(t, float64(4), got.Provider.Options["black-forest-labs"]["safety_tolerance"])
 }
 
 func TestGenerateOmitsProviderOptionsForOtherModels(t *testing.T) {

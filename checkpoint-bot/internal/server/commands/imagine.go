@@ -72,8 +72,7 @@ var ImagineCmd = &Command{
 					{Name: "1", Value: 1},
 					{Name: "2 default", Value: 2},
 					{Name: "3", Value: 3},
-					{Name: "4", Value: 4},
-					{Name: "5 most permissive", Value: 5},
+					{Name: "4 most permissive", Value: 4},
 				},
 			},
 		},
@@ -126,7 +125,13 @@ var ImagineCmd = &Command{
 			log.Warn("cannot check channel NSFW status", "err", err, "channel", i.ChannelID)
 			nsfw = false
 		}
-		tolerance, err := resolveImageSafetyTolerance(nsfw, requestedTolerance, h.ImageSafeTolerance, h.ImageNSFWTolerance)
+		tolerance, err := resolveImageSafetyTolerance(
+			nsfw,
+			requestedTolerance,
+			h.ImageSafeTolerance,
+			h.ImageNSFWTolerance,
+			maxSafetyToleranceForModel(h.ImageModel),
+		)
 		if err != nil {
 			respondEphemeral(s, i, "Safety tolerance can only be changed in NSFW channels.")
 			return
@@ -304,6 +309,17 @@ func imageGenerationErrorMessage(err error, nsfw bool) string {
 		}
 		return "The image provider blocked that prompt."
 	}
+
+	var providerErr *imagegen.ProviderError
+	if errors.As(err, &providerErr) {
+		if nsfw {
+			reason := strings.TrimSpace(providerErr.Reason)
+			if reason == "" {
+				reason = fmt.Sprintf("status %d", providerErr.StatusCode)
+			}
+			return "The image provider rejected the request: " + reason
+		}
+	}
 	return "Image generation failed. Try again in a bit."
 }
 
@@ -324,27 +340,37 @@ func channelIsNSFW(s *discordgo.Session, channelID string) (bool, error) {
 	return false, nil
 }
 
-func resolveImageSafetyTolerance(nsfw bool, requested *int, safeDefault, nsfwDefault int) (int, error) {
+func resolveImageSafetyTolerance(nsfw bool, requested *int, safeDefault, nsfwDefault, maxTolerance int) (int, error) {
 	if requested != nil {
 		if !nsfw {
 			return 0, fmt.Errorf("safety tolerance can only be changed in NSFW channels")
 		}
-		return clampTolerance(*requested), nil
+		return clampTolerance(*requested, maxTolerance), nil
 	}
 	if nsfw {
-		return clampTolerance(nsfwDefault), nil
+		return clampTolerance(nsfwDefault, maxTolerance), nil
 	}
-	return clampTolerance(safeDefault), nil
+	return clampTolerance(safeDefault, maxTolerance), nil
 }
 
-func clampTolerance(value int) int {
+func clampTolerance(value, maxTolerance int) int {
+	if maxTolerance < 0 {
+		maxTolerance = 0
+	}
 	if value < 0 {
 		return 0
 	}
-	if value > 5 {
-		return 5
+	if value > maxTolerance {
+		return maxTolerance
 	}
 	return value
+}
+
+func maxSafetyToleranceForModel(model string) int {
+	if strings.HasPrefix(strings.ToLower(model), "black-forest-labs/flux-3") {
+		return 4
+	}
+	return 5
 }
 
 func imageExtension(mediaType string) string {
