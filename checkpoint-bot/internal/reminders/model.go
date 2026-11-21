@@ -35,6 +35,7 @@ type Reminder struct {
 	Recurrence            *Recurrence `json:"recurrence,omitempty"`
 	Participants          []string    `json:"participants,omitempty"`
 	Active                bool        `json:"active"`
+	Failures              int         `json:"failures,omitempty"`
 	CreatedAt             time.Time   `json:"created_at"`
 }
 

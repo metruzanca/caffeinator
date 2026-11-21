@@ -227,6 +227,7 @@ Location: `internal/reminders/` and `internal/server/reminders.go`
 - Recurrence supports daily, weekly, monthly, and interval.
 - Next run times are computed in the user's timezone and stored in UTC.
 - Missed reminders older than `REMINDER_GRACE_MINUTES` are skipped.
+- Failed sends retry after `REMINDER_RETRY_MINUTES` up to `REMINDER_MAX_ATTEMPTS`.
 - Announcements are public and joinable by replying with `me too`, `+1`, and similar.
 - Join and leave replies must be intercepted before normal chat.
 - Trigger messages mention the creator and participants.
@@ -331,7 +332,7 @@ Configuration uses Viper and dotenv.
 - `MEMORY_MAX_CONTEXT_CHARS`, `MEMORY_MIN_CONFIDENCE`, and `MEMORY_EXTRACT_TIMEOUT_SECONDS` control memory size and extraction.
 - `MEMORY_PASSIVE_ENABLED`, `MEMORY_BATCH_SECONDS`, `MEMORY_MAX_BATCH_MESSAGES`, and `MEMORY_IGNORE_CHANNELS` control passive learning.
 - `IMAGE_ENABLED`, `IMAGE_MODEL`, `IMAGE_DEFAULT_RESOLUTION`, `IMAGE_DEFAULT_ASPECT_RATIO`, `IMAGE_MAX_REFERENCE_MB`, `IMAGE_TIMEOUT_SECONDS`, and `IMAGE_RATE_LIMIT_PER_HOUR` control image generation.
-- `REMINDERS_ENABLED`, `REMINDERS_PATH`, `REMINDER_TICK_SECONDS`, `REMINDER_GRACE_MINUTES`, and `REMINDER_MAX_PER_USER` control reminders.
+- `REMINDERS_ENABLED`, `REMINDERS_PATH`, `REMINDER_TICK_SECONDS`, `REMINDER_GRACE_MINUTES`, `REMINDER_MAX_PER_USER`, `REMINDER_RETRY_MINUTES`, and `REMINDER_MAX_ATTEMPTS` control reminders.
 - `VISION_ENABLED`, `VISION_MAX_IMAGES`, `VISION_MAX_IMAGE_MB`, and `VISION_DETAIL` control image understanding.
 
 ---

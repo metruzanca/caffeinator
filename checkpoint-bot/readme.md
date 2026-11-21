@@ -118,6 +118,7 @@ Details:
 - Recurring schedules support daily, weekly, monthly, and intervals such as every other week.
 - Times are computed in the user's timezone and stored in UTC. Discord timestamps display them locally.
 - Missed reminders fire only if they are less than 60 minutes late.
+- Failed reminder sends retry after 2 minutes, up to 5 attempts.
 - `/reminders` lists your reminders and public events, and lets you cancel or leave.
 - `/reminders` responses are ephemeral.
 
@@ -338,6 +339,8 @@ Copy `.env.example` to `.env` and fill it in, or set the same variables in your 
 | `REMINDER_TICK_SECONDS` | `15` | Scheduler tick interval |
 | `REMINDER_GRACE_MINUTES` | `60` | How late a missed reminder may still fire |
 | `REMINDER_MAX_PER_USER` | `50` | Maximum active reminders per user |
+| `REMINDER_RETRY_MINUTES` | `2` | Delay before retrying a failed reminder |
+| `REMINDER_MAX_ATTEMPTS` | `5` | Maximum send attempts before giving up |
 | `MEMORY_ENABLED` | `true` | Enable markdown memory |
 | `MEMORY_DIR` | `./memory` | Memory directory. Use `/data/memory` with a Railway volume |
 | `MEMORY_MAX_CONTEXT_CHARS` | `3000` | Maximum memory characters injected into a chat request |

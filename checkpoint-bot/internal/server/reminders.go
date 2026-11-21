@@ -365,10 +365,25 @@ func (c *ReminderService) Trigger(ctx context.Context, reminder *reminders.Remin
 	}
 	content = truncateRunes(content+body, 1900)
 
+	data := triggerMessageData(reminder, content, ids)
+	message, err := c.session.ChannelMessageSendComplex(reminder.ChannelID, data)
+	if err != nil {
+		return err
+	}
+
+	reminder.LastTriggerMessageID = message.ID
+	if err := c.store.Update(reminder); err != nil {
+		return err
+	}
+	log.Info("reminder triggered", "id", reminder.ID, "channel", reminder.ChannelID, "participants", len(ids))
+	return nil
+}
+
+func triggerMessageData(reminder *reminders.Reminder, content string, ids []string) *discordgo.MessageSend {
 	data := &discordgo.MessageSend{
 		Content: content,
 		AllowedMentions: &discordgo.MessageAllowedMentions{
-			Parse:       []discordgo.AllowedMentionType{discordgo.AllowedMentionTypeUsers},
+			Parse:       []discordgo.AllowedMentionType{},
 			Users:       ids,
 			RepliedUser: false,
 		},
@@ -382,18 +397,7 @@ func (c *ReminderService) Trigger(ctx context.Context, reminder *reminders.Remin
 			FailIfNotExists: &failIfNotExists,
 		}
 	}
-
-	message, err := c.session.ChannelMessageSendComplex(reminder.ChannelID, data)
-	if err != nil {
-		return err
-	}
-
-	reminder.LastTriggerMessageID = message.ID
-	if err := c.store.Update(reminder); err != nil {
-		return err
-	}
-	log.Info("reminder triggered", "id", reminder.ID, "channel", reminder.ChannelID, "participants", len(ids))
-	return nil
+	return data
 }
 
 func (c *ReminderService) sendReply(m *discordgo.MessageCreate, content string) {

@@ -72,6 +72,23 @@ func TestJoinAndLeavePatterns(t *testing.T) {
 	require.False(t, joinPattern.MatchString("I can't join, I have another meeting"))
 }
 
+func TestTriggerMessageAllowedMentions(t *testing.T) {
+	reminder := &reminders.Reminder{
+		AnnouncementMessageID: "announcement",
+		ChannelID:             "channel",
+		GuildID:               "guild",
+	}
+
+	data := triggerMessageData(reminder, "<@111> reminder", []string{"111"})
+
+	require.NotNil(t, data.AllowedMentions)
+	require.Empty(t, data.AllowedMentions.Parse)
+	require.Equal(t, []string{"111"}, data.AllowedMentions.Users)
+	require.False(t, data.AllowedMentions.RepliedUser)
+	require.NotNil(t, data.Reference)
+	require.Equal(t, "announcement", data.Reference.MessageID)
+}
+
 func TestMentionIDs(t *testing.T) {
 	reminder := &reminders.Reminder{
 		CreatorID:    "111",

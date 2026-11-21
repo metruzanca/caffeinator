@@ -26,7 +26,7 @@ func TestSchedulerFiresOneShot(t *testing.T) {
 	scheduler := NewScheduler(store, func(ctx context.Context, reminder *Reminder) error {
 		calls++
 		return nil
-	}, time.Minute, time.Hour)
+	}, time.Minute, time.Hour, time.Minute, 3)
 
 	scheduler.tick(now)
 	require.Equal(t, 1, calls)
@@ -56,7 +56,7 @@ func TestSchedulerAdvancesRecurring(t *testing.T) {
 	scheduler := NewScheduler(store, func(ctx context.Context, reminder *Reminder) error {
 		calls++
 		return nil
-	}, time.Minute, time.Hour)
+	}, time.Minute, time.Hour, time.Minute, 3)
 
 	scheduler.tick(now)
 	require.Equal(t, 1, calls)
@@ -65,6 +65,60 @@ func TestSchedulerAdvancesRecurring(t *testing.T) {
 	require.True(t, ok)
 	require.True(t, stored.Active)
 	require.True(t, stored.NextRunAt.After(now))
+}
+
+func TestSchedulerRetriesFailedTrigger(t *testing.T) {
+	store := testStore(t)
+	now := time.Now().UTC()
+	reminder := &Reminder{
+		Kind:      KindReminder,
+		CreatorID: "111",
+		ChannelID: "channel",
+		Timezone:  "UTC",
+		StartAt:   now.Add(-time.Minute),
+		NextRunAt: now.Add(-time.Minute),
+		Active:    true,
+	}
+	require.NoError(t, store.Create(reminder))
+
+	scheduler := NewScheduler(store, func(ctx context.Context, reminder *Reminder) error {
+		return context.DeadlineExceeded
+	}, time.Minute, time.Hour, 2*time.Minute, 3)
+
+	scheduler.tick(now)
+
+	stored, ok := store.Get(reminder.ID)
+	require.True(t, ok)
+	require.True(t, stored.Active)
+	require.Equal(t, 1, stored.Failures)
+	require.True(t, stored.NextRunAt.After(now))
+}
+
+func TestSchedulerDeactivatesAfterMaxFailures(t *testing.T) {
+	store := testStore(t)
+	now := time.Now().UTC()
+	reminder := &Reminder{
+		Kind:      KindReminder,
+		CreatorID: "111",
+		ChannelID: "channel",
+		Timezone:  "UTC",
+		StartAt:   now.Add(-time.Minute),
+		NextRunAt: now.Add(-time.Minute),
+		Active:    true,
+		Failures:  2,
+	}
+	require.NoError(t, store.Create(reminder))
+
+	scheduler := NewScheduler(store, func(ctx context.Context, reminder *Reminder) error {
+		return context.DeadlineExceeded
+	}, time.Minute, time.Hour, 2*time.Minute, 3)
+
+	scheduler.tick(now)
+
+	stored, ok := store.Get(reminder.ID)
+	require.True(t, ok)
+	require.False(t, stored.Active)
+	require.Equal(t, 0, stored.Failures)
 }
 
 func TestSchedulerSkipsMissedReminder(t *testing.T) {
@@ -85,7 +139,7 @@ func TestSchedulerSkipsMissedReminder(t *testing.T) {
 	scheduler := NewScheduler(store, func(ctx context.Context, reminder *Reminder) error {
 		calls++
 		return nil
-	}, time.Minute, time.Hour)
+	}, time.Minute, time.Hour, time.Minute, 3)
 
 	scheduler.tick(now)
 	require.Equal(t, 0, calls)

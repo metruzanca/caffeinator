@@ -312,12 +312,16 @@ func newReminderServiceFromConfig(session *discordgo.Session) (*ReminderService,
 		service.Trigger,
 		time.Duration(viper.GetInt("REMINDER_TICK_SECONDS"))*time.Second,
 		time.Duration(viper.GetInt("REMINDER_GRACE_MINUTES"))*time.Minute,
+		time.Duration(viper.GetInt("REMINDER_RETRY_MINUTES"))*time.Minute,
+		viper.GetInt("REMINDER_MAX_ATTEMPTS"),
 	)
 
 	log.Info("reminders enabled",
 		"path", path,
 		"tick", time.Duration(viper.GetInt("REMINDER_TICK_SECONDS"))*time.Second,
 		"max_per_user", viper.GetInt("REMINDER_MAX_PER_USER"),
+		"retry_minutes", viper.GetInt("REMINDER_RETRY_MINUTES"),
+		"max_attempts", viper.GetInt("REMINDER_MAX_ATTEMPTS"),
 	)
 	return service, scheduler
 }
