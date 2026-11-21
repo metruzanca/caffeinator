@@ -11,6 +11,7 @@ import (
 	"github.com/metruzanca/checkpoint-bot/internal/memory"
 	"github.com/metruzanca/checkpoint-bot/internal/server/commands"
 	"github.com/metruzanca/checkpoint-bot/internal/util"
+	"github.com/metruzanca/checkpoint-bot/internal/version"
 	"github.com/spf13/viper"
 )
 
@@ -49,7 +50,7 @@ func init() {
 // Start connects to Discord and registers handlers.
 func (b *Bot) Start() error {
 	b.DiscordClient.AddHandler(func(s *discordgo.Session, r *discordgo.Ready) {
-		log.Info("logged in", "username", s.State.User.Username, "bot_id", s.State.User.ID)
+		log.Info("logged in", "username", s.State.User.Username, "bot_id", s.State.User.ID, "build", version.Describe())
 
 		if !viper.GetBool("STARTUP_MESSAGE") {
 			return
@@ -74,7 +75,7 @@ func (b *Bot) Start() error {
 
 		channelID := viper.GetString("CHANNEL_ID")
 		if channelID != "" {
-			b.SendTextMessage(channelID, "Bot has restarted.")
+			b.SendTextMessage(channelID, restartNotice())
 		}
 	})
 
@@ -238,9 +239,32 @@ func (b *Bot) Stop() {
 	log.Info("bot stopped gracefully", "runtime", time.Since(startTime))
 }
 
-// SendTextMessage sends a plain text message to a channel.
+// restartNotice describes the build that just came up.
+func restartNotice() string {
+	return formatNotice(version.SHA(), version.Subject())
+}
+
+func formatNotice(sha, subject string) string {
+	switch {
+	case sha != "" && subject != "":
+		return "Bot has restarted. Built from `" + sha + "` " + subject
+	case sha != "":
+		return "Bot has restarted. Built from `" + sha + "`"
+	case subject != "":
+		return "Bot has restarted. Built from " + subject
+	default:
+		return "Bot has restarted."
+	}
+}
+
+// SendTextMessage sends a plain text message to a channel. Mentions are
+// suppressed because startup notices can include commit messages.
 func (b *Bot) SendTextMessage(channelID, message string) {
-	if _, err := b.DiscordClient.ChannelMessageSend(channelID, message); err != nil {
+	data := &discordgo.MessageSend{
+		Content:         message,
+		AllowedMentions: &discordgo.MessageAllowedMentions{Parse: []discordgo.AllowedMentionType{}},
+	}
+	if _, err := b.DiscordClient.ChannelMessageSendComplex(channelID, data); err != nil {
 		log.Error("cannot send message", "err", err, "channel", channelID)
 		return
 	}

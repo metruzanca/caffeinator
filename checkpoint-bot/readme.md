@@ -200,7 +200,7 @@ Copy `.env.example` to `.env` and fill it in, or set the same variables in your 
 | `TOKEN` | required | Discord bot token |
 | `CLIENT_ID` | empty | Discord application client ID, used by `checkpoint invite` |
 | `CHANNEL_ID` | empty | Optional channel for startup notifications |
-| `STARTUP_MESSAGE` | `true` | Print startup info and send the restart notice |
+| `STARTUP_MESSAGE` | `true` | Print startup info and send the restart notice with the deployed commit |
 | `LOG_FORMAT` | `text` | `text` or `json`. Automatically `json` when `RAILWAY_ENVIRONMENT` is set |
 | `OPENROUTER_API_KEY` | empty | Enables mention chat when set |
 | `OPENROUTER_MODEL` | `deepseek/deepseek-v4.1-flash-1017` | OpenRouter model slug |
@@ -226,6 +226,16 @@ Copy `.env.example` to `.env` and fill it in, or set the same variables in your 
 | `MEMORY_EXTRACT_TIMEOUT_SECONDS` | `30` | Background memory extraction timeout |
 
 If `OPENROUTER_API_KEY` is empty, the bot still runs and `/link` works. Mention chat is disabled with a startup warning.
+
+### Restart notice
+
+When `CHANNEL_ID` is set and `STARTUP_MESSAGE` is enabled, the bot posts the commit it was built from:
+
+```text
+Bot has restarted. Built from `74d7bc3` feat(chat): require compact inline citations for web search
+```
+
+Railway provides `RAILWAY_GIT_COMMIT_SHA` and `RAILWAY_GIT_COMMIT_MESSAGE` for GitHub deploys. Local builds fall back to the git revision Go embeds at build time, so the commit message can be missing there. The notice never pings anyone.
 
 ### Run from source
 
