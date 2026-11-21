@@ -662,6 +662,40 @@ func TestAdminMentionWithoutRememberSkipsExtraction(t *testing.T) {
 	require.Equal(t, 0, extractor.calls)
 }
 
+func TestIsGuildAdmin(t *testing.T) {
+	session, err := discordgo.New("Bot test")
+	require.NoError(t, err)
+
+	require.NoError(t, session.State.GuildAdd(&discordgo.Guild{
+		ID:      "guild",
+		OwnerID: "owner",
+		Roles: []*discordgo.Role{
+			{ID: "guild"},
+			{ID: "admin-role", Permissions: discordgo.PermissionAdministrator},
+		},
+	}))
+	require.NoError(t, session.State.ChannelAdd(&discordgo.Channel{
+		ID:      "channel",
+		GuildID: "guild",
+	}))
+
+	message := &discordgo.Message{
+		ID:        "1",
+		ChannelID: "channel",
+		GuildID:   "guild",
+		Author:    &discordgo.User{ID: "111"},
+		Member:    &discordgo.Member{Roles: []string{"admin-role"}},
+	}
+	require.True(t, isGuildAdmin(session, message))
+
+	message.Author.ID = "222"
+	message.Member.Roles = nil
+	require.False(t, isGuildAdmin(session, message))
+
+	message.Author.ID = "owner"
+	require.True(t, isGuildAdmin(session, message))
+}
+
 func TestWantsMemoryUpdate(t *testing.T) {
 	require.True(t, wantsMemoryUpdate("remember that this server is for developers"))
 	require.True(t, wantsMemoryUpdate("Please MEMORIZE this"))
