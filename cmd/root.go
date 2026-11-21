@@ -15,7 +15,7 @@ import (
 
 var rootCmd = &cobra.Command{
 	Use:               "caffeinator",
-	Short:             "Caffeinator, a self-hostable Discord bot",
+	Short:             "Caffeinator, a small self-hostable AI Discord bot",
 	PersistentPreRunE: config.PersistentPreRunE,
 	Run: func(cmd *cobra.Command, args []string) {
 		token := viper.GetString("TOKEN")
