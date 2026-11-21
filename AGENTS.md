@@ -9,6 +9,7 @@
 
 ## Structure
 
-- Caffeinator: a self-hostable Discord bot powered by an LLM with memory and web search. The repository root is the Go module.
+- Caffeinator: a small, self-hostable AI Discord bot with memory and web search. The repository root is the Go module.
 - Keep the project generic. Do not hardcode The Coffee Break in code. Use `BOT_NAME` and `COMMUNITY_NAME` for branding.
 - Keep the README short. Put feature details in `docs/` and link them from the README.
+- Keep the bot small. Prefer removing features over adding them. Do not add dashboards, databases, or plugin systems.

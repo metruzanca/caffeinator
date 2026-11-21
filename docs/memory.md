@@ -1,5 +1,7 @@
 # Memory
 
+Memory is still early. It misses things and the design will keep changing.
+
 The bot slowly learns durable facts from normal messages and from conversations where it is invoked. Facts are stored as human-readable markdown on disk.
 
 ## What it learns

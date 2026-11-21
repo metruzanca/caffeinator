@@ -3,7 +3,7 @@
 
   # ☕ Caffeinator
 
-  **A self-hostable AI Discord bot with chat, image generation, reminders, and memory**
+  **A small, focused AI Discord bot**
 
   [![Go Version](https://img.shields.io/badge/go-1.25-blue.svg)](https://golang.org)
   [![License](https://img.shields.io/badge/license-MPL%202.0-brightgreen.svg)](LICENSE)
@@ -12,14 +12,30 @@
 
 ---
 
-## Features
+## Why
 
-Caffeinator is an AI Discord bot written in Go with [discordgo](https://github.com/bwmarrin/discordgo). It runs as a single process and stores its state as files on disk.
+Caffeinator started as a fact checker for my Discord server. If a conversation made me doubt something, I could mention the bot and ask "is this true?", "what is OOP?", or "what is the latest CVE for PHP?".
+
+The first answers were walls of text. I wanted a bot that felt like another person in the channel, so replies became shorter and the tone became peer-like. `/ask` adds context, and memory tries to learn how the group actually talks. Memory is the newest part and still improving.
+
+Image generation and image understanding came from the group. The first things people tried were feeding the bot memes and asking it to make pictures, so both became part of it.
+
+Reminders came from running events. Natural language turned out to be nicer than slash commands, and the bot replaced another one we used for scheduling. Being able to trigger a bot at a set time is a useful pattern.
+
+## What it does
+
+Caffeinator is a small AI Discord bot written in Go with [discordgo](https://github.com/bwmarrin/discordgo). It does a few things well instead of trying to do everything.
 
 - **LLM chat.** Mention the bot or reply to it. Chat uses [OpenRouter](https://openrouter.ai/) with optional web search and image understanding. [Details](docs/chat.md)
 - **Image generation.** `/imagine` generates or edits images through OpenRouter. [Details](docs/image-generation.md)
 - **Reminders and events.** Natural language reminders, joinable events, and recurring schedules. [Details](docs/reminders.md)
 - **Memory.** Learns durable facts and stores them as editable markdown. [Details](docs/memory.md)
+
+## Small by design
+
+- One Go binary. No database, no web dashboard, no plugin system.
+- State is plain markdown and JSON on disk.
+- A handful of commands instead of a platform.
 
 ## Commands
 

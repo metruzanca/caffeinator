@@ -9,9 +9,11 @@
 - **MUST**: Respond to every Discord interaction exactly once.
 - **MUST**: Register slash commands from an `init()` function with `registerCommand()`.
 - **MUST**: Use "server" instead of "guild" in user-facing text.
+- **MUST**: Keep the bot small. Prefer removing features over adding them.
 - **MUST**: Never log message contents or API keys.
 - **MUST**: Learn only from conversations where the bot is invoked. Never read normal channel traffic.
 - **MUST NOT**: Add a database layer without an explicit product decision. Persistent state is markdown memory on disk.
+- **MUST NOT**: Add dashboards, plugin systems, or config UIs.
 
 **Key files**
 
