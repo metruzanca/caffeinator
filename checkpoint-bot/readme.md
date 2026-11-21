@@ -30,7 +30,7 @@ Checkpoint and goal tracking were removed. If that feature comes back, it will s
 | Command | Description |
 |---|---|
 | `/link url:<url>` | Rewrites X/Twitter links to `fxtwitter.com` and Instagram links to `kkinstagram.com`, and removes tracking query parameters. |
-| `/imagine prompt:<text> [image] [aspect_ratio] [resolution] [safety_tolerance]` | Generates an image. Attach a reference image to edit or restyle it. `safety_tolerance` only works in NSFW channels. |
+| `/imagine prompt:<text> [image] [aspect_ratio] [resolution] [safety_tolerance]` | Generates an image. Attach a reference image to edit or restyle it. |
 | `/timezone zone:<iana>` | Sets your timezone for reminders. |
 | `/reminders list\|cancel\|leave` | Lists and manages your reminders. Responses are ephemeral. |
 | `/ask text:<text> [history_length] [disable_memory]` | Runs the same chat pipeline as a mention. `history_length` defaults to 10 and can go up to 100. Set `disable_memory` to skip memory reads and writes for that ask. Responses are public. |
@@ -52,7 +52,7 @@ The rewritten link is posted publicly so everyone can click or preview it.
 
 ## Image generation
 
-`/imagine` generates images through OpenRouter using `black-forest-labs/flux.2-klein-4b` by default.
+`/imagine` generates images through OpenRouter using `black-forest-labs/flux-3-image-klein` by default.
 
 ```text
 /imagine prompt:a red panda astronaut, studio lighting
@@ -63,29 +63,24 @@ Options:
 
 - `image` is an optional reference image for editing or style transfer.
 - `aspect_ratio` supports `1:1`, `16:9`, `9:16`, `4:3`, `3:4`, `3:2`, `2:3`, and `auto`.
-- `resolution` supports `1K`, `1.5K`, and `2K` on Flux 3 and Seedream. Flux 2 uses aspect ratio only.
-- `safety_tolerance` supports `0` through `5` on Flux 2, and `0` through `4` on Flux 3. It can only be changed in NSFW channels.
+- `resolution` supports `1K`, `1.5K`, and `2K`.
+- `safety_tolerance` supports `0` through `4` in every channel.
 
 Defaults:
 
 - Aspect ratio `1:1`
-- Safety tolerance `2` in normal channels
-- Safety tolerance `5` in NSFW channels
+- Resolution `1K`
+- Safety tolerance `2`
 - One image per request
-- Five generations per user per hour
+- Twenty generations per user per hour
 
-Normal channels always use tolerance `2`. An explicit `safety_tolerance` in a normal channel is rejected. NSFW channels can use `0` through `5`. Threads inherit the parent channel’s NSFW status.
+Anyone can pass `safety_tolerance:4` for a more permissive request. The setting does not guarantee mature output. Black Forest Labs still blocks illegal and explicit content.
 
 Reference images are downloaded from Discord, converted to base64, and sent to OpenRouter. PNG, JPEG, and WebP are accepted. The default limit is 8 MB.
 
-Image generation is billed per image by OpenRouter, not by tokens. Flux 2 Klein 4B costs about $0.014 per megapixel at the time of writing. Higher tolerance does not guarantee explicit output. Black Forest Labs still blocks illegal content.
+Image generation is billed per image by OpenRouter, not by tokens. Flux 3 Image Klein costs about $0.009 per image at 1K at the time of writing.
 
-If the provider blocks a prompt:
-
-- Normal channels get a cheeky, non-explicit response. The bot does not redirect people to NSFW channels.
-- NSFW channels get the provider’s moderation reason.
-
-If generation is rate limited, the bot replies with a Discord relative timestamp such as "Try again <t:...:R>". This covers both the per-user limit and provider throttling. When the provider reports how long to wait, the bot uses that value. Messages such as "too many active tasks" have no hint, so the bot suggests 30 seconds.
+If the provider blocks a prompt, the bot shows the provider reason. If generation is rate limited, the bot replies with a Discord relative timestamp such as "Try again <t:...:R>". This covers both the per-user limit and provider throttling. When the provider reports how long to wait, the bot uses that value. Messages such as "too many active tasks" have no hint, so the bot suggests 30 seconds.
 
 When a prompt fails, the reply ends with a copy-pasteable retry command:
 
@@ -348,14 +343,13 @@ Copy `.env.example` to `.env` and fill it in, or set the same variables in your 
 | `CHAT_RATE_LIMIT_CAPACITY` | `1` | Requests allowed per user per window |
 | `CHAT_RATE_LIMIT_SECONDS` | `5` | Rate limit window |
 | `IMAGE_ENABLED` | `true` | Enable `/imagine` |
-| `IMAGE_MODEL` | `black-forest-labs/flux.2-klein-4b` | OpenRouter image model |
+| `IMAGE_MODEL` | `black-forest-labs/flux-3-image-klein` | OpenRouter image model |
 | `IMAGE_DEFAULT_RESOLUTION` | `1K` | Default image resolution |
 | `IMAGE_DEFAULT_ASPECT_RATIO` | `1:1` | Default image aspect ratio |
-| `IMAGE_SAFE_CHANNEL_TOLERANCE` | `2` | Safety tolerance used in normal channels |
-| `IMAGE_SAFETY_TOLERANCE` | `5` | Safety tolerance used in NSFW channels |
+| `IMAGE_SAFETY_TOLERANCE` | `2` | Default moderation tolerance |
 | `IMAGE_MAX_REFERENCE_MB` | `8` | Maximum reference image size |
 | `IMAGE_TIMEOUT_SECONDS` | `120` | Image generation timeout |
-| `IMAGE_RATE_LIMIT_PER_HOUR` | `5` | Image generations per user per hour |
+| `IMAGE_RATE_LIMIT_PER_HOUR` | `20` | Image generations per user per hour |
 | `REMINDERS_ENABLED` | `true` | Enable reminders and events |
 | `REMINDERS_PATH` | `./reminders.json` | Reminder JSON file. Use `/data/reminders.json` on Railway |
 | `REMINDER_TICK_SECONDS` | `15` | Scheduler tick interval |

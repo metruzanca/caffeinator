@@ -65,15 +65,14 @@ var ImagineCmd = &Command{
 			{
 				Type:        discordgo.ApplicationCommandOptionInteger,
 				Name:        "safety_tolerance",
-				Description: "Moderation tolerance, 0 strict to 5 permissive. NSFW channels only",
+				Description: "Moderation tolerance, 0 strict to 4 permissive",
 				Required:    false,
 				Choices: []*discordgo.ApplicationCommandOptionChoice{
 					{Name: "0 strictest", Value: 0},
 					{Name: "1", Value: 1},
 					{Name: "2 default", Value: 2},
 					{Name: "3", Value: 3},
-					{Name: "4", Value: 4},
-					{Name: "5 (Flux 2)", Value: 5},
+					{Name: "4 most permissive", Value: 4},
 				},
 			},
 		},
@@ -121,25 +120,7 @@ var ImagineCmd = &Command{
 			return
 		}
 
-		nsfw, err := channelIsNSFW(s, i.ChannelID)
-		if err != nil {
-			log.Warn("cannot check channel NSFW status", "err", err, "channel", i.ChannelID)
-			nsfw = false
-		}
-		tolerance, err := resolveImageSafetyTolerance(
-			nsfw,
-			requestedTolerance,
-			h.ImageSafeTolerance,
-			h.ImageNSFWTolerance,
-			maxSafetyToleranceForModel(h.ImageModel),
-		)
-		if err != nil {
-			respondEphemeral(s, i, "Safety tolerance can only be changed in NSFW channels.")
-			return
-		}
-		if !modelSupportsResolution(h.ImageModel) {
-			resolution = ""
-		}
+		tolerance := resolveImageSafetyTolerance(requestedTolerance, h.ImageSafetyTolerance)
 
 		if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
@@ -172,7 +153,7 @@ var ImagineCmd = &Command{
 		})
 		if err != nil {
 			log.Error("image generation failed", "err", err, "user", userID, "channel", i.ChannelID)
-			editInteractionError(s, i, withImagePrompt(imageGenerationErrorMessage(err, nsfw), prompt))
+			editInteractionError(s, i, withImagePrompt(imageGenerationErrorMessage(err), prompt))
 			return
 		}
 
@@ -185,7 +166,6 @@ var ImagineCmd = &Command{
 			"duration", time.Since(started),
 			"reference", attachment != nil,
 			"safety_tolerance", tolerance,
-			"nsfw_channel", nsfw,
 		)
 
 		if err := sendGeneratedImages(s, i, prompt, result.Images); err != nil {
@@ -320,20 +300,14 @@ func discordRetryTimestamp(wait time.Duration) string {
 	return fmt.Sprintf("<t:%d:R>", time.Now().Add(wait).Unix())
 }
 
-func imageGenerationErrorMessage(err error, nsfw bool) string {
+func imageGenerationErrorMessage(err error) string {
 	var blocked *imagegen.ContentBlockedError
 	if errors.As(err, &blocked) {
-		if nsfw {
-			reason := strings.TrimSpace(blocked.Reason)
-			if reason == "" {
-				reason = "content policy"
-			}
-			return "Blocked by the image provider: " + reason
+		reason := strings.TrimSpace(blocked.Reason)
+		if reason == "" {
+			reason = "content policy"
 		}
-		if blocked.Category == imagegen.BlockedSexual {
-			return "That's a bit too lewd for my liking. This is a Christian server."
-		}
-		return "The image provider blocked that prompt."
+		return "Blocked by the image provider: " + reason
 	}
 
 	var rateErr *imagegen.RateLimitError
@@ -343,81 +317,38 @@ func imageGenerationErrorMessage(err error, nsfw bool) string {
 			wait = defaultProviderRetryWait
 		}
 		message := "The image provider is rate limited. Try again " + discordRetryTimestamp(wait) + "."
-		if nsfw {
-			if reason := strings.TrimSpace(rateErr.Reason); reason != "" {
-				message += "\n> " + reason
-			}
+		if reason := strings.TrimSpace(rateErr.Reason); reason != "" {
+			message += "\n> " + reason
 		}
 		return message
 	}
 
 	var providerErr *imagegen.ProviderError
 	if errors.As(err, &providerErr) {
-		if nsfw {
-			reason := strings.TrimSpace(providerErr.Reason)
-			if reason == "" {
-				reason = fmt.Sprintf("status %d", providerErr.StatusCode)
-			}
-			return "The image provider rejected the request: " + reason
+		reason := strings.TrimSpace(providerErr.Reason)
+		if reason == "" {
+			reason = fmt.Sprintf("status %d", providerErr.StatusCode)
 		}
+		return "The image provider rejected the request: " + reason
 	}
 	return "Image generation failed. Try again in a bit."
 }
 
-func channelIsNSFW(s *discordgo.Session, channelID string) (bool, error) {
-	channel, err := s.Channel(channelID)
-	if err != nil {
-		return false, err
-	}
-	if channel.NSFW {
-		return true, nil
-	}
-	if channel.ParentID != "" {
-		parent, err := s.Channel(channel.ParentID)
-		if err == nil && parent.NSFW {
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func resolveImageSafetyTolerance(nsfw bool, requested *int, safeDefault, nsfwDefault, maxTolerance int) (int, error) {
+func resolveImageSafetyTolerance(requested *int, defaultTolerance int) int {
 	if requested != nil {
-		if !nsfw {
-			return 0, fmt.Errorf("safety tolerance can only be changed in NSFW channels")
-		}
-		return clampTolerance(*requested, maxTolerance), nil
+		return clampTolerance(*requested)
 	}
-	if nsfw {
-		return clampTolerance(nsfwDefault, maxTolerance), nil
-	}
-	return clampTolerance(safeDefault, maxTolerance), nil
+	return clampTolerance(defaultTolerance)
 }
 
-func clampTolerance(value, maxTolerance int) int {
-	if maxTolerance < 0 {
-		maxTolerance = 0
-	}
+func clampTolerance(value int) int {
 	if value < 0 {
 		return 0
 	}
-	if value > maxTolerance {
-		return maxTolerance
-	}
-	return value
-}
-
-func maxSafetyToleranceForModel(model string) int {
-	if strings.HasPrefix(strings.ToLower(model), "black-forest-labs/flux-3") {
+	if value > 4 {
 		return 4
 	}
-	return 5
-}
-
-func modelSupportsResolution(model string) bool {
-	model = strings.ToLower(model)
-	return strings.HasPrefix(model, "black-forest-labs/flux-3") ||
-		strings.HasPrefix(model, "bytedance-seed/seedream")
+	return value
 }
 
 func imageExtension(mediaType string) string {

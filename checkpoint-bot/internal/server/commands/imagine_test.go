@@ -86,21 +86,18 @@ func TestImageGenerationErrorMessage(t *testing.T) {
 		Reason:   "flagged for sexual or adult content",
 		Category: imagegen.BlockedSexual,
 	}
-	require.Equal(t, "That's a bit too lewd for my liking. This is a Christian server.", imageGenerationErrorMessage(sexual, false))
-	require.Contains(t, imageGenerationErrorMessage(sexual, true), "flagged for sexual or adult content")
+	require.Equal(t, "Blocked by the image provider: flagged for sexual or adult content", imageGenerationErrorMessage(sexual))
 
 	other := &imagegen.ContentBlockedError{
 		Reason:   "violated the content policy",
 		Category: imagegen.BlockedOther,
 	}
-	require.Equal(t, "The image provider blocked that prompt.", imageGenerationErrorMessage(other, false))
-	require.Contains(t, imageGenerationErrorMessage(other, true), "violated the content policy")
+	require.Equal(t, "Blocked by the image provider: violated the content policy", imageGenerationErrorMessage(other))
 
 	provider := &imagegen.ProviderError{Reason: "submit returned 422", StatusCode: 422}
-	require.Equal(t, "Image generation failed. Try again in a bit.", imageGenerationErrorMessage(provider, false))
-	require.Contains(t, imageGenerationErrorMessage(provider, true), "submit returned 422")
+	require.Equal(t, "The image provider rejected the request: submit returned 422", imageGenerationErrorMessage(provider))
 
-	require.Equal(t, "Image generation failed. Try again in a bit.", imageGenerationErrorMessage(errors.New("boom"), false))
+	require.Equal(t, "Image generation failed. Try again in a bit.", imageGenerationErrorMessage(errors.New("boom")))
 }
 
 func TestImageGenerationRateLimitMessage(t *testing.T) {
@@ -110,15 +107,10 @@ func TestImageGenerationRateLimitMessage(t *testing.T) {
 		RetryAfter: 45 * time.Second,
 	}
 
-	message := imageGenerationErrorMessage(rateErr, false)
+	message := imageGenerationErrorMessage(rateErr)
 	require.Contains(t, message, "rate limited")
 	require.Contains(t, message, "<t:")
-	require.NotContains(t, message, "too many active tasks")
-
-	nsfwMessage := imageGenerationErrorMessage(rateErr, true)
-	require.Contains(t, nsfwMessage, "rate limited")
-	require.Contains(t, nsfwMessage, "<t:")
-	require.Contains(t, nsfwMessage, "too many active tasks")
+	require.Contains(t, message, "too many active tasks")
 }
 
 func TestImageGenerationRateLimitMessageWithoutHint(t *testing.T) {
@@ -127,7 +119,7 @@ func TestImageGenerationRateLimitMessageWithoutHint(t *testing.T) {
 		StatusCode: http.StatusTooManyRequests,
 	}
 
-	require.Contains(t, imageGenerationErrorMessage(rateErr, false), "<t:")
+	require.Contains(t, imageGenerationErrorMessage(rateErr), "<t:")
 }
 
 func TestWithImagePrompt(t *testing.T) {
@@ -146,50 +138,19 @@ func TestDiscordRetryTimestamp(t *testing.T) {
 }
 
 func TestResolveImageSafetyTolerance(t *testing.T) {
-	requested := 5
+	require.Equal(t, 2, resolveImageSafetyTolerance(nil, 2))
 
-	value, err := resolveImageSafetyTolerance(false, nil, 2, 5, 4)
-	require.NoError(t, err)
-	require.Equal(t, 2, value)
-
-	value, err = resolveImageSafetyTolerance(true, nil, 2, 5, 4)
-	require.NoError(t, err)
-	require.Equal(t, 4, value)
-
-	value, err = resolveImageSafetyTolerance(true, &requested, 2, 5, 4)
-	require.NoError(t, err)
-	require.Equal(t, 4, value)
-
-	_, err = resolveImageSafetyTolerance(false, &requested, 2, 5, 4)
-	require.Error(t, err)
+	requested := 4
+	require.Equal(t, 4, resolveImageSafetyTolerance(&requested, 2))
 
 	tooHigh := 9
-	value, err = resolveImageSafetyTolerance(true, &tooHigh, 2, 5, 4)
-	require.NoError(t, err)
-	require.Equal(t, 4, value)
+	require.Equal(t, 4, resolveImageSafetyTolerance(&tooHigh, 2))
 
 	tooLow := -1
-	value, err = resolveImageSafetyTolerance(true, &tooLow, 2, 5, 4)
-	require.NoError(t, err)
-	require.Equal(t, 0, value)
+	require.Equal(t, 0, resolveImageSafetyTolerance(&tooLow, 2))
 
-	value, err = resolveImageSafetyTolerance(true, &requested, 2, 5, 5)
-	require.NoError(t, err)
-	require.Equal(t, 5, value)
-}
-
-func TestMaxSafetyToleranceForModel(t *testing.T) {
-	require.Equal(t, 4, maxSafetyToleranceForModel("black-forest-labs/flux-3-image-klein"))
-	require.Equal(t, 4, maxSafetyToleranceForModel("black-forest-labs/flux-3-image"))
-	require.Equal(t, 5, maxSafetyToleranceForModel("black-forest-labs/flux.2-klein-4b"))
-	require.Equal(t, 5, maxSafetyToleranceForModel("some-other-model"))
-}
-
-func TestModelSupportsResolution(t *testing.T) {
-	require.True(t, modelSupportsResolution("black-forest-labs/flux-3-image-klein"))
-	require.False(t, modelSupportsResolution("black-forest-labs/flux.2-klein-4b"))
-	require.True(t, modelSupportsResolution("bytedance-seed/seedream-5-0-flash"))
-	require.False(t, modelSupportsResolution("some-other-model"))
+	defaultTooHigh := 9
+	require.Equal(t, 4, resolveImageSafetyTolerance(nil, defaultTooHigh))
 }
 
 func TestImageExtension(t *testing.T) {

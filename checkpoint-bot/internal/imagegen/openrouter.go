@@ -18,7 +18,7 @@ import (
 
 const (
 	defaultBaseURL = "https://openrouter.ai/api/v1"
-	defaultModel   = "black-forest-labs/flux.2-klein-4b"
+	defaultModel   = "black-forest-labs/flux-3-image-klein"
 	maxBodyBytes   = 64 << 20
 )
 
@@ -179,15 +179,11 @@ func (c *Client) Generate(ctx context.Context, req Request) (Result, error) {
 	}
 	if req.SafetyTolerance != nil && strings.HasPrefix(strings.ToLower(model), "black-forest-labs/") {
 		tolerance := *req.SafetyTolerance
-		maxTolerance := 5
-		if strings.HasPrefix(strings.ToLower(model), "black-forest-labs/flux-3") {
-			maxTolerance = 4
-		}
 		if tolerance < 0 {
 			tolerance = 0
 		}
-		if tolerance > maxTolerance {
-			tolerance = maxTolerance
+		if tolerance > 4 {
+			tolerance = 4
 		}
 		body.Provider = &providerOptions{
 			Options: map[string]map[string]any{

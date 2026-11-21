@@ -63,8 +63,7 @@ type CommandHandler struct {
 	ImageModel             string
 	ImageResolution        string
 	ImageAspectRatio       string
-	ImageSafeTolerance     int
-	ImageNSFWTolerance     int
+	ImageSafetyTolerance   int
 	ImageMaxReferenceBytes int64
 	ImageTimeout           time.Duration
 }
