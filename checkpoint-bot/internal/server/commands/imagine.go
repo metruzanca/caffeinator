@@ -146,7 +146,7 @@ var ImagineCmd = &Command{
 			"reference", attachment != nil,
 		)
 
-		if err := sendGeneratedImages(s, i, result.Images); err != nil {
+		if err := sendGeneratedImages(s, i, prompt, result.Images); err != nil {
 			log.Error("cannot send generated images", "err", err, "channel", i.ChannelID)
 			editInteractionError(s, i, "Generated the image but could not upload it.")
 		}
@@ -206,14 +206,14 @@ func supportedReferenceType(contentType string) bool {
 	}
 }
 
-func sendGeneratedImages(s *discordgo.Session, i *discordgo.InteractionCreate, images []imagegen.Output) error {
+func sendGeneratedImages(s *discordgo.Session, i *discordgo.InteractionCreate, prompt string, images []imagegen.Output) error {
 	if len(images) == 0 {
 		return fmt.Errorf("no images to send")
 	}
 
-	empty := ""
+	caption := imageCaption(prompt)
 	_, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-		Content: &empty,
+		Content: &caption,
 		Files:   imageFiles(images),
 		AllowedMentions: &discordgo.MessageAllowedMentions{
 			Parse: []discordgo.AllowedMentionType{},
@@ -224,7 +224,7 @@ func sendGeneratedImages(s *discordgo.Session, i *discordgo.InteractionCreate, i
 	}
 
 	log.Warn("cannot attach image to deferred response, using follow-up", "err", err)
-	message := "Here's your image:"
+	message := caption
 	if _, editErr := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 		Content: &message,
 	}); editErr != nil {
@@ -237,6 +237,11 @@ func sendGeneratedImages(s *discordgo.Session, i *discordgo.InteractionCreate, i
 		},
 	})
 	return err
+}
+
+// imageCaption uses the prompt as the message text shown with the images.
+func imageCaption(prompt string) string {
+	return strings.TrimSpace(prompt)
 }
 
 func imageFiles(images []imagegen.Output) []*discordgo.File {

@@ -72,6 +72,12 @@ func TestDownloadReferenceImageWithoutAttachment(t *testing.T) {
 	require.Empty(t, got)
 }
 
+func TestImageCaption(t *testing.T) {
+	require.Equal(t, "a cat in space", imageCaption("  a cat in space  "))
+	require.Equal(t, "a cat in space", imageCaption("a cat in space"))
+	require.Empty(t, imageCaption("   "))
+}
+
 func TestImageExtension(t *testing.T) {
 	require.Equal(t, ".jpg", imageExtension("image/jpeg"))
 	require.Equal(t, ".webp", imageExtension("image/webp"))
