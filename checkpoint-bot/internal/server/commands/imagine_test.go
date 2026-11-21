@@ -130,6 +130,16 @@ func TestImageGenerationRateLimitMessageWithoutHint(t *testing.T) {
 	require.Contains(t, imageGenerationErrorMessage(rateErr, false), "<t:")
 }
 
+func TestWithImagePrompt(t *testing.T) {
+	got := withImagePrompt("it broke", "a duck")
+	require.Equal(t, "it broke\n\nTry again with:\n/imagine prompt:a duck", got)
+
+	got = withImagePrompt("it broke", "line one\nline two")
+	require.Contains(t, got, "/imagine prompt:line one line two")
+
+	require.Equal(t, "it broke", withImagePrompt("it broke", "   "))
+}
+
 func TestDiscordRetryTimestamp(t *testing.T) {
 	timestamp := discordRetryTimestamp(0)
 	require.Regexp(t, `^<t:\d+:R>$`, timestamp)

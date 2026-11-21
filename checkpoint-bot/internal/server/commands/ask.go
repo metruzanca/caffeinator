@@ -162,7 +162,8 @@ func sendInteractionContent(s *discordgo.Session, i *discordgo.InteractionCreate
 
 func editInteractionError(s *discordgo.Session, i *discordgo.InteractionCreate, message string) {
 	if _, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-		Content: &message,
+		Content:         &message,
+		AllowedMentions: &discordgo.MessageAllowedMentions{Parse: []discordgo.AllowedMentionType{}},
 	}); err != nil {
 		log.Error("cannot edit interaction response", "err", err, "channel", i.ChannelID)
 	}

@@ -87,6 +87,13 @@ If the provider blocks a prompt:
 
 If generation is rate limited, the bot replies with a Discord relative timestamp such as "Try again <t:...:R>". This covers both the per-user limit and provider throttling. When the provider reports how long to wait, the bot uses that value. Messages such as "too many active tasks" have no hint, so the bot suggests 30 seconds.
 
+When a prompt fails, the reply ends with a copy-pasteable retry command:
+
+```text
+Try again with:
+/imagine prompt:a duck
+```
+
 ---
 
 ## Reminders and events

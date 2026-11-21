@@ -158,7 +158,7 @@ var ImagineCmd = &Command{
 		reference, err := downloadReferenceImage(ctx, attachment, h.ImageMaxReferenceBytes)
 		if err != nil {
 			log.Error("cannot download reference image", "err", err, "user", userID, "channel", i.ChannelID)
-			editInteractionError(s, i, "Could not read that image. Use a PNG, JPEG, or WebP under the size limit.")
+			editInteractionError(s, i, withImagePrompt("Could not read that image. Use a PNG, JPEG, or WebP under the size limit.", prompt))
 			return
 		}
 
@@ -172,7 +172,7 @@ var ImagineCmd = &Command{
 		})
 		if err != nil {
 			log.Error("image generation failed", "err", err, "user", userID, "channel", i.ChannelID)
-			editInteractionError(s, i, imageGenerationErrorMessage(err, nsfw))
+			editInteractionError(s, i, withImagePrompt(imageGenerationErrorMessage(err, nsfw), prompt))
 			return
 		}
 
@@ -300,6 +300,17 @@ func imageFiles(images []imagegen.Output) []*discordgo.File {
 
 // defaultProviderRetryWait is used when the provider gives no retry hint.
 const defaultProviderRetryWait = 30 * time.Second
+
+// withImagePrompt appends a copy-pasteable retry command to a failure message.
+func withImagePrompt(message, prompt string) string {
+	prompt = strings.TrimSpace(prompt)
+	if prompt == "" {
+		return message
+	}
+	prompt = strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ").Replace(prompt)
+	prompt = strings.Join(strings.Fields(prompt), " ")
+	return message + "\n\nTry again with:\n/imagine prompt:" + prompt
+}
 
 // discordRetryTimestamp renders a relative Discord timestamp, e.g. "in 5 minutes".
 func discordRetryTimestamp(wait time.Duration) string {
