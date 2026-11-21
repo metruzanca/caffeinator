@@ -78,6 +78,35 @@ func TestImageCaption(t *testing.T) {
 	require.Empty(t, imageCaption("   "))
 }
 
+func TestResolveImageSafetyTolerance(t *testing.T) {
+	requested := 5
+
+	value, err := resolveImageSafetyTolerance(false, nil, 2, 5)
+	require.NoError(t, err)
+	require.Equal(t, 2, value)
+
+	value, err = resolveImageSafetyTolerance(true, nil, 2, 5)
+	require.NoError(t, err)
+	require.Equal(t, 5, value)
+
+	value, err = resolveImageSafetyTolerance(true, &requested, 2, 5)
+	require.NoError(t, err)
+	require.Equal(t, 5, value)
+
+	_, err = resolveImageSafetyTolerance(false, &requested, 2, 5)
+	require.Error(t, err)
+
+	tooHigh := 9
+	value, err = resolveImageSafetyTolerance(true, &tooHigh, 2, 5)
+	require.NoError(t, err)
+	require.Equal(t, 5, value)
+
+	tooLow := -1
+	value, err = resolveImageSafetyTolerance(true, &tooLow, 2, 5)
+	require.NoError(t, err)
+	require.Equal(t, 0, value)
+}
+
 func TestImageExtension(t *testing.T) {
 	require.Equal(t, ".jpg", imageExtension("image/jpeg"))
 	require.Equal(t, ".webp", imageExtension("image/webp"))

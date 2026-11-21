@@ -128,6 +128,8 @@ func (b *Bot) Start() error {
 		b.CommandHandler.ImageLimiter = ratelimit.New(viper.GetInt("IMAGE_RATE_LIMIT_PER_HOUR"), time.Hour)
 		b.CommandHandler.ImageResolution = viper.GetString("IMAGE_DEFAULT_RESOLUTION")
 		b.CommandHandler.ImageAspectRatio = viper.GetString("IMAGE_DEFAULT_ASPECT_RATIO")
+		b.CommandHandler.ImageSafeTolerance = viper.GetInt("IMAGE_SAFE_CHANNEL_TOLERANCE")
+		b.CommandHandler.ImageNSFWTolerance = viper.GetInt("IMAGE_SAFETY_TOLERANCE")
 		b.CommandHandler.ImageMaxReferenceBytes = int64(viper.GetInt("IMAGE_MAX_REFERENCE_MB")) << 20
 		b.CommandHandler.ImageTimeout = time.Duration(viper.GetInt("IMAGE_TIMEOUT_SECONDS")) * time.Second
 	}
@@ -340,7 +342,7 @@ func newImageClientFromConfig() *imagegen.Client {
 
 	model := strings.TrimSpace(viper.GetString("IMAGE_MODEL"))
 	if model == "" {
-		model = "bytedance-seed/seedream-5-0-flash"
+		model = "black-forest-labs/flux-3-image-klein"
 	}
 
 	baseURL := strings.TrimSpace(viper.GetString("OPENROUTER_BASE_URL"))

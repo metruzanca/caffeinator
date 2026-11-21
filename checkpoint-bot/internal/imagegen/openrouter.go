@@ -15,7 +15,7 @@ import (
 
 const (
 	defaultBaseURL = "https://openrouter.ai/api/v1"
-	defaultModel   = "bytedance-seed/seedream-5-0-flash"
+	defaultModel   = "black-forest-labs/flux-3-image-klein"
 	maxBodyBytes   = 64 << 20
 )
 
@@ -27,6 +27,7 @@ type Request struct {
 	AspectRatio      string
 	OutputFormat     string
 	ReferenceDataURL string
+	SafetyTolerance  *int
 }
 
 // Output is a generated image.
@@ -57,6 +58,11 @@ type imageRequest struct {
 	OutputFormat    string           `json:"output_format,omitempty"`
 	ResponseFormat  string           `json:"response_format"`
 	InputReferences []inputReference `json:"input_references,omitempty"`
+	Provider        *providerOptions `json:"provider,omitempty"`
+}
+
+type providerOptions struct {
+	Options map[string]map[string]any `json:"options,omitempty"`
 }
 
 type inputReference struct {
@@ -109,6 +115,22 @@ func (c *Client) Generate(ctx context.Context, req Request) (Result, error) {
 		reference := inputReference{Type: "image_url"}
 		reference.ImageURL.URL = ref
 		body.InputReferences = []inputReference{reference}
+	}
+	if req.SafetyTolerance != nil && strings.HasPrefix(strings.ToLower(model), "black-forest-labs/") {
+		tolerance := *req.SafetyTolerance
+		if tolerance < 0 {
+			tolerance = 0
+		}
+		if tolerance > 5 {
+			tolerance = 5
+		}
+		body.Provider = &providerOptions{
+			Options: map[string]map[string]any{
+				"black-forest-labs": {
+					"safety_tolerance": tolerance,
+				},
+			},
+		}
 	}
 
 	payload, err := json.Marshal(body)

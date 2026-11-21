@@ -36,9 +36,10 @@ func TestGenerateBuildsRequest(t *testing.T) {
 	}))
 	defer server.Close()
 
+	tolerance := 5
 	client := &Client{
 		APIKey:     "test-key",
-		Model:      "bytedance-seed/seedream-5-0-flash",
+		Model:      "black-forest-labs/flux-3-image-klein",
 		BaseURL:    server.URL,
 		HTTPClient: server.Client(),
 	}
@@ -48,6 +49,7 @@ func TestGenerateBuildsRequest(t *testing.T) {
 		Resolution:       "1K",
 		AspectRatio:      "1:1",
 		ReferenceDataURL: "data:image/png;base64,abc",
+		SafetyTolerance:  &tolerance,
 	})
 	require.NoError(t, err)
 	require.Equal(t, 0.018, result.CostUSD)
@@ -57,7 +59,7 @@ func TestGenerateBuildsRequest(t *testing.T) {
 
 	require.Equal(t, "/images", gotPath)
 	require.Equal(t, "Bearer test-key", gotAuth)
-	require.Equal(t, "bytedance-seed/seedream-5-0-flash", got.Model)
+	require.Equal(t, "black-forest-labs/flux-3-image-klein", got.Model)
 	require.Equal(t, "turn this into watercolor", got.Prompt)
 	require.Equal(t, "1K", got.Resolution)
 	require.Equal(t, "1:1", got.AspectRatio)
@@ -65,6 +67,36 @@ func TestGenerateBuildsRequest(t *testing.T) {
 	require.Len(t, got.InputReferences, 1)
 	require.Equal(t, "image_url", got.InputReferences[0].Type)
 	require.Equal(t, "data:image/png;base64,abc", got.InputReferences[0].ImageURL.URL)
+	require.NotNil(t, got.Provider)
+	require.Equal(t, float64(5), got.Provider.Options["black-forest-labs"]["safety_tolerance"])
+}
+
+func TestGenerateOmitsProviderOptionsForOtherModels(t *testing.T) {
+	var got imageRequest
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := json.NewDecoder(r.Body).Decode(&got); err != nil {
+			t.Errorf("cannot decode request: %v", err)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"data":[{"b64_json":"` + base64.StdEncoding.EncodeToString([]byte("image")) + `"}]}`))
+	}))
+	defer server.Close()
+
+	tolerance := 5
+	client := &Client{
+		APIKey:     "test-key",
+		Model:      "bytedance-seed/seedream-5-0-flash",
+		BaseURL:    server.URL,
+		HTTPClient: server.Client(),
+	}
+
+	_, err := client.Generate(context.Background(), Request{
+		Prompt:          "hello",
+		SafetyTolerance: &tolerance,
+	})
+	require.NoError(t, err)
+	require.Nil(t, got.Provider)
 }
 
 func TestGenerateAPIError(t *testing.T) {

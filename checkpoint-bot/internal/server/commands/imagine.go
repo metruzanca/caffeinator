@@ -61,6 +61,20 @@ var ImagineCmd = &Command{
 					{Name: "2K", Value: "2K"},
 				},
 			},
+			{
+				Type:        discordgo.ApplicationCommandOptionInteger,
+				Name:        "safety_tolerance",
+				Description: "Moderation tolerance, 0 strict to 5 permissive. NSFW channels only",
+				Required:    false,
+				Choices: []*discordgo.ApplicationCommandOptionChoice{
+					{Name: "0 strictest", Value: 0},
+					{Name: "1", Value: 1},
+					{Name: "2 default", Value: 2},
+					{Name: "3", Value: 3},
+					{Name: "4", Value: 4},
+					{Name: "5 most permissive", Value: 5},
+				},
+			},
 		},
 	},
 	Handler: func(h *CommandHandler, s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -78,6 +92,7 @@ var ImagineCmd = &Command{
 		var prompt string
 		aspectRatio := h.ImageAspectRatio
 		resolution := h.ImageResolution
+		var requestedTolerance *int
 		var attachment *discordgo.MessageAttachment
 
 		data := i.ApplicationCommandData()
@@ -89,6 +104,9 @@ var ImagineCmd = &Command{
 				aspectRatio = opt.StringValue()
 			case "resolution":
 				resolution = opt.StringValue()
+			case "safety_tolerance":
+				value := int(opt.IntValue())
+				requestedTolerance = &value
 			case "image":
 				id, ok := opt.Value.(string)
 				if ok && data.Resolved != nil {
@@ -99,6 +117,17 @@ var ImagineCmd = &Command{
 
 		if prompt == "" {
 			respondEphemeral(s, i, "Prompt cannot be empty.")
+			return
+		}
+
+		nsfw, err := channelIsNSFW(s, i.ChannelID)
+		if err != nil {
+			log.Warn("cannot check channel NSFW status", "err", err, "channel", i.ChannelID)
+			nsfw = false
+		}
+		tolerance, err := resolveImageSafetyTolerance(nsfw, requestedTolerance, h.ImageSafeTolerance, h.ImageNSFWTolerance)
+		if err != nil {
+			respondEphemeral(s, i, "Safety tolerance can only be changed in NSFW channels.")
 			return
 		}
 
@@ -129,6 +158,7 @@ var ImagineCmd = &Command{
 			Resolution:       resolution,
 			AspectRatio:      aspectRatio,
 			ReferenceDataURL: reference,
+			SafetyTolerance:  &tolerance,
 		})
 		if err != nil {
 			log.Error("image generation failed", "err", err, "user", userID, "channel", i.ChannelID)
@@ -144,6 +174,8 @@ var ImagineCmd = &Command{
 			"cost_usd", result.CostUSD,
 			"duration", time.Since(started),
 			"reference", attachment != nil,
+			"safety_tolerance", tolerance,
+			"nsfw_channel", nsfw,
 		)
 
 		if err := sendGeneratedImages(s, i, prompt, result.Images); err != nil {
@@ -254,6 +286,46 @@ func imageFiles(images []imagegen.Output) []*discordgo.File {
 		})
 	}
 	return files
+}
+
+func channelIsNSFW(s *discordgo.Session, channelID string) (bool, error) {
+	channel, err := s.Channel(channelID)
+	if err != nil {
+		return false, err
+	}
+	if channel.NSFW {
+		return true, nil
+	}
+	if channel.ParentID != "" {
+		parent, err := s.Channel(channel.ParentID)
+		if err == nil && parent.NSFW {
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func resolveImageSafetyTolerance(nsfw bool, requested *int, safeDefault, nsfwDefault int) (int, error) {
+	if requested != nil {
+		if !nsfw {
+			return 0, fmt.Errorf("safety tolerance can only be changed in NSFW channels")
+		}
+		return clampTolerance(*requested), nil
+	}
+	if nsfw {
+		return clampTolerance(nsfwDefault), nil
+	}
+	return clampTolerance(safeDefault), nil
+}
+
+func clampTolerance(value int) int {
+	if value < 0 {
+		return 0
+	}
+	if value > 5 {
+		return 5
+	}
+	return value
 }
 
 func imageExtension(mediaType string) string {
