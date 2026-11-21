@@ -1,5 +1,5 @@
 <div align="center">
-  <img src=".github/Remote_Caffeinator.png" alt="Risk of Rain 2's remote caffeinator" width="200">
+  <img src=".github/caffeinator.png" alt="Risk of Rain 2's remote caffeinator" width="200">
 
   # ☕ Caffeinator
 
