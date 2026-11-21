@@ -45,12 +45,11 @@ The bot has no database, ORM, migration tool, or `go generate` step. Persistent 
 
 Features:
 
-1. `/link` rewrites social media URLs for embed-friendly hosts.
-2. Mention and reply chat sends recent channel context to OpenRouter and posts the response.
-3. `/ask` runs the same chat pipeline with configurable history and memory opt-out.
-4. `/memory` lets users inspect and remove their own memory. Admins can target other users or server memory.
-5. `/imagine` generates images through OpenRouter, with an optional reference image.
-6. Reminders and events are created from natural language, stored as JSON, and fired by a scheduler.
+1. Mention and reply chat sends recent channel context to OpenRouter and posts the response.
+2. `/ask` runs the same chat pipeline with configurable history and memory opt-out.
+3. `/memory` lets users inspect and remove their own memory. Admins can target other users or server memory.
+4. `/imagine` generates images through OpenRouter, with an optional reference image.
+5. Reminders and events are created from natural language, stored as JSON, and fired by a scheduler.
 
 `cmd/root.go` starts the bot and handles shutdown. `internal/server.NewBot` creates the Discord session and sets the required intents. `Bot.Start` connects, registers the chat handler, installs slash commands, and handles newly joined servers.
 
@@ -123,24 +122,6 @@ Handler rules:
 - MUST respond exactly once. If a response fails, log it.
 - MUST use user-friendly messages and say "server", not "guild".
 - MUST log failures before responding.
-
----
-
-## Link Rewriting
-
-Location: `internal/server/commands/link.go`
-
-`RewriteLink` is a pure function. Keep it that way so it stays easy to test.
-
-Rules:
-
-- Rewrite hosts only from the explicit allowlist.
-- Force HTTPS.
-- Remove query strings and fragments.
-- Preserve the path.
-- Do not fetch the URL. This avoids SSRF.
-
-Add new hosts to the switch in `RewriteLink` and add table-driven test cases.
 
 ---
 
@@ -345,7 +326,7 @@ Configuration uses Viper and dotenv.
 - `OPENROUTER_APP_URL` sets the referer sent to OpenRouter for attribution.
 - `OPENROUTER_API_KEY` is environment-only and should never be added as a flag.
 - `.env` is gitignored. Keep `.env.example` current.
-- If the OpenRouter key is empty, mention chat is disabled and `/link` still works.
+- `OPENROUTER_API_KEY` is required. The bot exits at startup when it is missing.
 - `CHAT_SYSTEM_PROMPT` overrides the built-in peer-tone prompt.
 - Web search is enabled by default with `OPENROUTER_WEB_SEARCH=true`. It is capped by `OPENROUTER_WEB_SEARCH_MAX_RESULTS` and `OPENROUTER_WEB_SEARCH_MAX_USES` to control cost.
 - Memory is enabled by default with `MEMORY_ENABLED=true`.
@@ -364,7 +345,6 @@ Configuration uses Viper and dotenv.
 - Use interfaces for Discord and LLM dependencies in `chat.go`.
 - Use `httptest` for the OpenRouter chat and image clients.
 - Do not call live Discord or OpenRouter APIs in tests.
-- Add table-driven cases for link rewriting.
 - Test the memory store with `t.TempDir()`.
 - Test extraction with a fake chat client.
 - Test reminder recurrence with fixed times and IANA timezones.

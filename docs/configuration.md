@@ -47,7 +47,7 @@ The Discord username, avatar, and description are set in the [Discord Developer 
 | `CHANNEL_ID` | empty | Optional channel for startup notifications |
 | `STARTUP_MESSAGE` | `true` | Print startup info and send the restart notice |
 | `LOG_FORMAT` | `text` | `text` or `json`. Automatically `json` when `RAILWAY_ENVIRONMENT` is set |
-| `OPENROUTER_API_KEY` | empty | Enables chat when set |
+| `OPENROUTER_API_KEY` | required | OpenRouter API key |
 | `OPENROUTER_MODEL` | `deepseek/deepseek-v4.1-flash-1017` | OpenRouter model slug |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Override for testing |
 | `OPENROUTER_APP_URL` | `https://github.com/metruzanca/caffeinator` | OpenRouter attribution URL |
@@ -94,7 +94,7 @@ The Discord username, avatar, and description are set in the [Discord Developer 
 | `VISION_MAX_IMAGE_MB` | `8` | Maximum image size in MB |
 | `VISION_DETAIL` | `auto` | Image detail: `auto`, `low`, `high`, or `original` |
 
-If `OPENROUTER_API_KEY` is empty, the bot still runs and `/link` works. Chat is disabled with a startup warning.
+`TOKEN` and `OPENROUTER_API_KEY` are required. The bot exits at startup when either is missing.
 
 ## Railway notes
 

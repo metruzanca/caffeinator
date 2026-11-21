@@ -5,7 +5,7 @@ Mention the bot, or reply to one of its messages, and it answers through OpenRou
 - Mention: `@Caffeinator what do you think about this?`
 - Reply: reply directly to a bot message, with or without an `@`.
 
-Chat needs `OPENROUTER_API_KEY`. Without it the bot still runs and `/link` works, but chat is disabled with a startup warning.
+Chat needs `OPENROUTER_API_KEY`. The bot refuses to start without it.
 
 ## Context
 

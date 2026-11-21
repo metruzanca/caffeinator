@@ -3,7 +3,7 @@
 
   # ☕ Caffeinator
 
-  **A self-hostable Discord bot with LLM chat, image generation, reminders, and memory**
+  **A self-hostable AI Discord bot with chat, image generation, reminders, and memory**
 
   [![Go Version](https://img.shields.io/badge/go-1.25-blue.svg)](https://golang.org)
   [![License](https://img.shields.io/badge/license-MPL%202.0-brightgreen.svg)](LICENSE)
@@ -14,9 +14,8 @@
 
 ## Features
 
-Caffeinator is a Discord bot written in Go with [discordgo](https://github.com/bwmarrin/discordgo). It runs as a single process and stores its state as files on disk.
+Caffeinator is an AI Discord bot written in Go with [discordgo](https://github.com/bwmarrin/discordgo). It runs as a single process and stores its state as files on disk.
 
-- **Link fixing.** Rewrites X/Twitter and Instagram links so Discord renders proper embeds. [Details](docs/link-rewriting.md)
 - **LLM chat.** Mention the bot or reply to it. Chat uses [OpenRouter](https://openrouter.ai/) with optional web search and image understanding. [Details](docs/chat.md)
 - **Image generation.** `/imagine` generates or edits images through OpenRouter. [Details](docs/image-generation.md)
 - **Reminders and events.** Natural language reminders, joinable events, and recurring schedules. [Details](docs/reminders.md)
@@ -26,7 +25,6 @@ Caffeinator is a Discord bot written in Go with [discordgo](https://github.com/b
 
 | Command | Description |
 |---|---|
-| `/link url:<url>` | Rewrites X/Twitter and Instagram links for better embeds. |
 | `/imagine prompt:<text> [image] [aspect_ratio] [resolution] [safety_tolerance]` | Generates an image, optionally from a reference image. |
 | `/ask text:<text> [history_length] [disable_memory]` | Runs the chat pipeline with more context control. |
 | `/timezone zone:<iana>` | Sets your timezone for reminders. |
@@ -55,6 +53,8 @@ REMINDERS_PATH=/data/reminders.json
 ```
 
 7. Deploy. Railway detects Go from `go.mod` at the repository root.
+
+`TOKEN`, `CLIENT_ID`, and `OPENROUTER_API_KEY` are required. The bot exits at startup if the Discord token or OpenRouter key is missing.
 
 The bot prints an invite link on startup when `STARTUP_MESSAGE=true`. You can also run `caffeinator invite` locally.
 

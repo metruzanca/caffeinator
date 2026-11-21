@@ -31,7 +31,7 @@ go test ./...
 go vet ./...
 ```
 
-The suite covers link rewriting, context assembly, mention detection, `/ask`, memory storage and extraction, image generation request and response handling, reminders and recurrence, response chunking, rate limiting, and the OpenRouter clients. Tests use `httptest` and never call live APIs.
+The suite covers context assembly, mention detection, `/ask`, memory storage and extraction, image generation request and response handling, reminders and recurrence, response chunking, rate limiting, and the OpenRouter clients. Tests use `httptest` and never call live APIs.
 
 ## Local run
 
