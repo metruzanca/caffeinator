@@ -46,10 +46,13 @@ func Execute() {
 }
 
 func init() {
+	viper.SetDefault("BOT_NAME", config.DefaultBotName)
+	viper.SetDefault("COMMUNITY_NAME", config.DefaultCommunityName)
 	viper.SetDefault("LOG_FORMAT", "")
 	viper.SetDefault("STARTUP_MESSAGE", true)
 	viper.SetDefault("OPENROUTER_MODEL", "deepseek/deepseek-v4.1-flash-1017")
 	viper.SetDefault("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1")
+	viper.SetDefault("OPENROUTER_APP_URL", config.DefaultAppURL)
 	viper.SetDefault("OPENROUTER_WEB_SEARCH", true)
 	viper.SetDefault("OPENROUTER_WEB_SEARCH_MAX_RESULTS", 3)
 	viper.SetDefault("OPENROUTER_WEB_SEARCH_MAX_USES", 2)
@@ -93,12 +96,15 @@ func init() {
 	viper.SetDefault("VISION_MAX_IMAGE_MB", 8)
 	viper.SetDefault("VISION_DETAIL", "auto")
 
+	rootCmd.PersistentFlags().String("BOT_NAME", config.DefaultBotName, "Name the bot uses when it refers to itself")
+	rootCmd.PersistentFlags().String("COMMUNITY_NAME", config.DefaultCommunityName, "Server or community the bot belongs to")
 	rootCmd.PersistentFlags().String("TOKEN", "", "Discord bot token (required)")
 	rootCmd.PersistentFlags().String("LOG_FORMAT", "", "Log format: text or json (auto json on Railway)")
 	rootCmd.PersistentFlags().String("CLIENT_ID", "", "Discord application client ID")
 	rootCmd.PersistentFlags().String("CHANNEL_ID", "", "Discord channel ID for startup notifications")
 	rootCmd.PersistentFlags().Bool("STARTUP_MESSAGE", true, "Send startup notifications")
 	rootCmd.PersistentFlags().String("OPENROUTER_MODEL", "deepseek/deepseek-v4.1-flash-1017", "OpenRouter model slug")
+	rootCmd.PersistentFlags().String("OPENROUTER_APP_URL", config.DefaultAppURL, "OpenRouter app URL used for attribution")
 	rootCmd.PersistentFlags().Bool("OPENROUTER_WEB_SEARCH", true, "Enable OpenRouter web search for mention chat")
 	rootCmd.PersistentFlags().Int("OPENROUTER_WEB_SEARCH_MAX_RESULTS", 3, "Maximum results per web search")
 	rootCmd.PersistentFlags().Int("OPENROUTER_WEB_SEARCH_MAX_USES", 2, "Maximum web searches per chat request")

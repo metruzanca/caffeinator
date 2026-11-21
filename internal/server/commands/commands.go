@@ -2,10 +2,12 @@ package commands
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/charmbracelet/log"
+	"github.com/metruzanca/caffeinator/internal/config"
 	"github.com/metruzanca/caffeinator/internal/imagegen"
 	"github.com/metruzanca/caffeinator/internal/ratelimit"
 )
@@ -129,7 +131,9 @@ func (h *CommandHandler) RegisterCommands() {
 // RegisterCommandsForGuild registers every command in a single guild.
 func (h *CommandHandler) RegisterCommandsForGuild(guildID string) {
 	for _, cmd := range commands {
-		registeredCmd, err := h.DiscordClient.ApplicationCommandCreate(h.DiscordClient.State.User.ID, guildID, &cmd.ApplicationCommand)
+		appCommand := cmd.ApplicationCommand
+		appCommand.Description = resolveDescription(appCommand.Description)
+		registeredCmd, err := h.DiscordClient.ApplicationCommandCreate(h.DiscordClient.State.User.ID, guildID, &appCommand)
 		if err != nil {
 			log.Error("cannot register new command", "command", cmd.Name, "guild", guildID, "err", err)
 			continue
@@ -142,6 +146,13 @@ func (h *CommandHandler) RegisterCommandsForGuild(guildID string) {
 // functions in command files.
 func registerCommand(cmd *Command) {
 	commands[cmd.ApplicationCommand.Name] = cmd
+}
+
+// resolveDescription fills the bot name into command descriptions at
+// registration time. init() runs before configuration is loaded, so the
+// placeholder cannot be resolved earlier.
+func resolveDescription(description string) string {
+	return strings.ReplaceAll(description, "{bot}", config.BotName())
 }
 
 // GetAvailableCommands returns all registered command names and descriptions.
@@ -159,7 +170,7 @@ func GetAvailableCommands() []struct {
 			Description string
 		}{
 			Name:        cmd.Name,
-			Description: cmd.Description,
+			Description: resolveDescription(cmd.Description),
 		})
 	}
 	return result

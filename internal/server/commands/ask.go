@@ -13,7 +13,7 @@ import (
 var AskCmd = &Command{
 	ApplicationCommand: discordgo.ApplicationCommand{
 		Name:        "ask",
-		Description: "Ask Caffeinator with a custom amount of channel context",
+		Description: "Ask {bot} with a custom amount of channel context",
 		Options: []*discordgo.ApplicationCommandOption{
 			{
 				Type:        discordgo.ApplicationCommandOptionString,

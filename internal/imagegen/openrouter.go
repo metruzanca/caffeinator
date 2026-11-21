@@ -14,6 +14,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/metruzanca/caffeinator/internal/config"
 )
 
 const (
@@ -210,8 +212,8 @@ func (c *Client) Generate(ctx context.Context, req Request) (Result, error) {
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+c.APIKey)
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("HTTP-Referer", "https://github.com/metruzanca/caffeinator")
-	httpReq.Header.Set("X-Title", "Caffeinator")
+	httpReq.Header.Set("HTTP-Referer", config.AppURL())
+	httpReq.Header.Set("X-Title", config.BotName())
 
 	resp, err := c.httpClient().Do(httpReq)
 	if err != nil {
