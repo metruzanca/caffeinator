@@ -70,12 +70,19 @@ Web search:
 - The prompt asks for at most two citations unless the user asks for more, and forbids inventing URLs.
 - Web search uses OpenRouter credits, roughly $0.007 per search with the default Exa engine, plus model token costs. Casual mentions that do not need current information should not search at all.
 
+Discord formatting:
+
+- Users are mentioned with `<@1234567890>`.
+- Channels are mentioned with `<#1234567890>`.
+- Timestamps use Unix seconds, for example `<t:1795222140:R>` or `<t:1795222140:f>`.
+- The bot includes the current Unix time in each request so timestamps stay accurate.
+- User mentions are allowed and can ping. `@everyone`, `@here`, and role mentions are blocked.
+
 Other behavior:
 
 - Other bots and the bot's own messages are ignored.
 - Replies and mentions are rate limited per user.
 - Responses are capped at 3 Discord messages.
-- The model cannot ping `@everyone`, roles, or users in its reply.
 - Guild channels only for now.
 
 Messages in the context window are sent to OpenRouter. Do not mention the bot in channels where that is not acceptable.

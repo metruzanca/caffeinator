@@ -264,7 +264,9 @@ func TestHandleRespondsToMention(t *testing.T) {
 		require.Equal(t, "the answer", sent.Content)
 		require.NotNil(t, sent.Reference)
 		require.Equal(t, "2", sent.Reference.MessageID)
-		require.Empty(t, sent.AllowedMentions.Parse)
+		require.Contains(t, sent.AllowedMentions.Parse, discordgo.AllowedMentionTypeUsers)
+		require.NotContains(t, sent.AllowedMentions.Parse, discordgo.AllowedMentionTypeEveryone)
+		require.NotContains(t, sent.AllowedMentions.Parse, discordgo.AllowedMentionTypeRoles)
 		require.False(t, sent.AllowedMentions.RepliedUser)
 	case <-time.After(time.Second):
 		t.Fatal("response was not sent")
@@ -368,7 +370,7 @@ func TestHandleIgnoresReplyToOtherUserWithoutMention(t *testing.T) {
 	require.Equal(t, 0, client.calls)
 }
 
-func TestSendDisablesMentionsAndReferencesMessage(t *testing.T) {
+func TestSendAllowsUserMentionsAndReferencesMessage(t *testing.T) {
 	session := &fakeChatSession{sentCh: make(chan *discordgo.MessageSend, 1)}
 	chat := newChat(session, &fakeChatClient{}, ChatConfig{})
 
@@ -379,7 +381,9 @@ func TestSendDisablesMentionsAndReferencesMessage(t *testing.T) {
 		require.Equal(t, "@everyone hello", sent.Content)
 		require.NotNil(t, sent.Reference)
 		require.Equal(t, "42", sent.Reference.MessageID)
-		require.Empty(t, sent.AllowedMentions.Parse)
+		require.Contains(t, sent.AllowedMentions.Parse, discordgo.AllowedMentionTypeUsers)
+		require.NotContains(t, sent.AllowedMentions.Parse, discordgo.AllowedMentionTypeEveryone)
+		require.NotContains(t, sent.AllowedMentions.Parse, discordgo.AllowedMentionTypeRoles)
 		require.False(t, sent.AllowedMentions.RepliedUser)
 	case <-time.After(time.Second):
 		t.Fatal("message was not sent")
@@ -427,6 +431,7 @@ func TestAskUsesMemory(t *testing.T) {
 	require.Contains(t, client.systemPrompt, "base prompt")
 	require.Contains(t, client.systemPrompt, "Building a Go Discord bot.")
 	require.Contains(t, client.systemPrompt, "The server is for developers.")
+	require.Contains(t, client.systemPrompt, "Current Unix time:")
 }
 
 func TestAskDisableMemorySkipsMemory(t *testing.T) {

@@ -139,7 +139,7 @@ func sendInteractionContent(s *discordgo.Session, i *discordgo.InteractionCreate
 
 	first := chunks[0]
 	allowedMentions := &discordgo.MessageAllowedMentions{
-		Parse:       []discordgo.AllowedMentionType{},
+		Parse:       []discordgo.AllowedMentionType{discordgo.AllowedMentionTypeUsers},
 		RepliedUser: false,
 	}
 	if _, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{

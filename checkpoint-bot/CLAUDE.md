@@ -175,6 +175,7 @@ Context rules:
 - A system prompt tells the bot its stack: Go, discordgo, Railway, OpenRouter, and DeepSeek V4.1 Flash 1017.
 - It also tells the bot that memory is automatic, tool-free, does not require a mention, and is limited to facts people share about themselves. It must not claim it cannot remember between sessions.
 - It requires inline Discord markdown citations for web search results, using short relevant phrases as link text and at most two citations by default.
+- It requires Discord mention and timestamp formatting: `<@id>`, `<#id>`, and `<t:unix:R>`.
 - It makes replies peer-like: casual, direct, and free of unsolicited remediation.
 - It bans em dashes and asks for short, simple sentences.
 - It also limits replies to a single tweet (280 characters) unless the user asks for more detail.
@@ -183,7 +184,8 @@ Context rules:
 Response rules:
 
 - Reply to the triggering message.
-- Disable all mentions with `AllowedMentions` and `RepliedUser: false`.
+- Allow user mentions with `AllowedMentions`, but block everyone and role mentions. Keep `RepliedUser: false`.
+- Append the current Unix time to the system prompt so Discord timestamp output is accurate.
 - Split responses over Discord's 2000-character limit, up to `CHAT_MAX_CHUNKS`.
 - Use a typing indicator while waiting.
 - Rate limit per user and cap concurrent requests.
