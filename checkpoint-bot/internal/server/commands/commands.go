@@ -46,6 +46,7 @@ type ImageService interface {
 // ReminderService manages user timezones and reminder records.
 type ReminderService interface {
 	SetTimezone(userID, zone string) error
+	Timezone(userID string) string
 	ListForUser(userID string) string
 	Cancel(userID, idPrefix string) (bool, error)
 	Leave(userID, idPrefix string) (bool, error)

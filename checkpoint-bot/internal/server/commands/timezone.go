@@ -7,17 +7,17 @@ import (
 	"github.com/charmbracelet/log"
 )
 
-// TimezoneCmd sets the user's IANA timezone.
+// TimezoneCmd sets or shows the user's IANA timezone.
 var TimezoneCmd = &Command{
 	ApplicationCommand: discordgo.ApplicationCommand{
 		Name:        "timezone",
-		Description: "Set your timezone for reminders",
+		Description: "Set or show your timezone for reminders",
 		Options: []*discordgo.ApplicationCommandOption{
 			{
 				Type:        discordgo.ApplicationCommandOptionString,
 				Name:        "zone",
-				Description: "IANA timezone, for example America/New_York",
-				Required:    true,
+				Description: "IANA timezone, for example America/New_York. Omit to show the current value",
+				Required:    false,
 			},
 		},
 	},
@@ -33,12 +33,18 @@ var TimezoneCmd = &Command{
 				zone = strings.TrimSpace(opt.StringValue())
 			}
 		}
+
+		userID := interactionUserID(i)
 		if zone == "" {
-			respondEphemeral(s, i, "Timezone cannot be empty.")
+			current := h.Reminders.Timezone(userID)
+			if current == "" {
+				respondEphemeral(s, i, "No timezone set. Use /timezone zone:America/New_York.")
+				return
+			}
+			respondEphemeral(s, i, "Your timezone is "+current+".")
 			return
 		}
 
-		userID := interactionUserID(i)
 		if err := h.Reminders.SetTimezone(userID, zone); err != nil {
 			log.Warn("cannot set timezone", "err", err, "user", userID, "zone", zone)
 			respondEphemeral(s, i, "Invalid timezone. Use an IANA name like America/New_York or Europe/London.")

@@ -74,6 +74,7 @@ func (c *ReminderService) HandleMessage(ctx context.Context, m *discordgo.Messag
 	}
 
 	timezone := c.store.Timezone(m.Author.ID)
+	log.Info("reminder request", "user", m.Author.ID, "timezone", timezone, "text_chars", len([]rune(text)))
 	now := time.Now()
 	if timezone != "" {
 		if loc, err := time.LoadLocation(timezone); err == nil {
@@ -300,6 +301,11 @@ func (c *ReminderService) SetTimezone(userID, zone string) error {
 		return err
 	}
 	return c.store.SetTimezone(userID, zone)
+}
+
+// Timezone returns a user's saved timezone.
+func (c *ReminderService) Timezone(userID string) string {
+	return c.store.Timezone(userID)
 }
 
 // Cancel deletes a reminder created by the user.
