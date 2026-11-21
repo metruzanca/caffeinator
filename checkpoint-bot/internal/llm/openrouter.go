@@ -20,8 +20,84 @@ const (
 
 // Message is a single chat message in an OpenAI-compatible request.
 type Message struct {
-	Role    string `json:"role"`
-	Content string `json:"content"`
+	Role    string        `json:"role"`
+	Content string        `json:"-"`
+	Parts   []ContentPart `json:"-"`
+}
+
+// ContentPart is a text or image part in a multimodal message.
+type ContentPart struct {
+	Type     string    `json:"type"`
+	Text     string    `json:"text,omitempty"`
+	ImageURL *ImageURL `json:"image_url,omitempty"`
+}
+
+// ImageURL points at an image or a base64 data URL.
+type ImageURL struct {
+	URL    string `json:"url"`
+	Detail string `json:"detail,omitempty"`
+}
+
+// MarshalJSON keeps text-only messages as a string and switches to content
+// parts when images are present.
+func (m Message) MarshalJSON() ([]byte, error) {
+	type wireMessage struct {
+		Role    string `json:"role"`
+		Content any    `json:"content"`
+	}
+
+	if len(m.Parts) == 0 {
+		return json.Marshal(wireMessage{Role: m.Role, Content: m.Content})
+	}
+
+	parts := make([]ContentPart, 0, len(m.Parts)+1)
+	if strings.TrimSpace(m.Content) != "" {
+		parts = append(parts, ContentPart{Type: "text", Text: m.Content})
+	}
+	parts = append(parts, m.Parts...)
+
+	return json.Marshal(wireMessage{Role: m.Role, Content: parts})
+}
+
+// UnmarshalJSON accepts either a string or an array of content parts.
+func (m *Message) UnmarshalJSON(data []byte) error {
+	var wire struct {
+		Role    string          `json:"role"`
+		Content json.RawMessage `json:"content"`
+	}
+	if err := json.Unmarshal(data, &wire); err != nil {
+		return err
+	}
+
+	m.Role = wire.Role
+	m.Content = ""
+	m.Parts = nil
+
+	if len(wire.Content) == 0 || string(wire.Content) == "null" {
+		return nil
+	}
+
+	var text string
+	if err := json.Unmarshal(wire.Content, &text); err == nil {
+		m.Content = text
+		return nil
+	}
+
+	var parts []ContentPart
+	if err := json.Unmarshal(wire.Content, &parts); err != nil {
+		return err
+	}
+	for _, part := range parts {
+		if part.Type == "text" {
+			if m.Content != "" {
+				m.Content += "\n"
+			}
+			m.Content += part.Text
+			continue
+		}
+		m.Parts = append(m.Parts, part)
+	}
+	return nil
 }
 
 // Usage reports token usage for a request.

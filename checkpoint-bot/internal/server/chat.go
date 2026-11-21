@@ -56,6 +56,10 @@ type ChatConfig struct {
 	MemoryMaxContextChars int
 	MemoryExtractTimeout  time.Duration
 	PassiveMemory         bool
+	VisionEnabled         bool
+	VisionMaxImages       int
+	VisionMaxImageMB      int
+	VisionDetail          string
 }
 
 // Chat handles messages that mention the bot or reply to it.
@@ -103,6 +107,18 @@ func newChat(session chatSession, client chatClient, cfg ChatConfig) *Chat {
 	}
 	if cfg.MemoryExtractTimeout <= 0 {
 		cfg.MemoryExtractTimeout = 30 * time.Second
+	}
+	if cfg.VisionMaxImages <= 0 {
+		cfg.VisionMaxImages = 4
+	}
+	if cfg.VisionMaxImageMB <= 0 {
+		cfg.VisionMaxImageMB = 8
+	}
+	switch strings.ToLower(strings.TrimSpace(cfg.VisionDetail)) {
+	case "auto", "low", "high", "original":
+		cfg.VisionDetail = strings.ToLower(strings.TrimSpace(cfg.VisionDetail))
+	default:
+		cfg.VisionDetail = "auto"
 	}
 
 	return &Chat{
@@ -226,6 +242,9 @@ func (c *Chat) generate(ctx context.Context, m *discordgo.MessageCreate, referen
 	messages := buildMessages(history, m, prompt, botID, c.cfg)
 	if len(messages) == 0 {
 		return "", errors.New("no context to send")
+	}
+	if parts := c.visionParts(m, referenced); len(parts) > 0 {
+		messages[len(messages)-1].Parts = parts
 	}
 
 	retrievalSubjects := collectSubjects(m, referenced, prompt, botID, nil)

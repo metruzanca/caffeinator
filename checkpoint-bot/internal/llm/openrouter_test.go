@@ -68,6 +68,50 @@ func TestChatSendsMessagesWithoutSystemPrompt(t *testing.T) {
 	}
 }
 
+func TestMessageMarshalsTextOnly(t *testing.T) {
+	data, err := json.Marshal(Message{Role: "user", Content: "hello"})
+	require.NoError(t, err)
+
+	var raw map[string]any
+	require.NoError(t, json.Unmarshal(data, &raw))
+	require.Equal(t, "hello", raw["content"])
+}
+
+func TestMessageMarshalsImageParts(t *testing.T) {
+	message := Message{
+		Role:    "user",
+		Content: "what is this?",
+		Parts: []ContentPart{
+			{Type: "text", Text: "Current message image: test.png"},
+			{Type: "image_url", ImageURL: &ImageURL{URL: "https://cdn.discordapp.com/test.png", Detail: "auto"}},
+		},
+	}
+
+	data, err := json.Marshal(message)
+	require.NoError(t, err)
+
+	var raw map[string]any
+	require.NoError(t, json.Unmarshal(data, &raw))
+	content, ok := raw["content"].([]any)
+	require.True(t, ok)
+	require.Len(t, content, 3)
+	require.Equal(t, "text", content[0].(map[string]any)["type"])
+	require.Equal(t, "what is this?", content[0].(map[string]any)["text"])
+	require.Equal(t, "image_url", content[2].(map[string]any)["type"])
+}
+
+func TestMessageUnmarshalsImageParts(t *testing.T) {
+	data := []byte(`{"role":"user","content":[{"type":"text","text":"look"},{"type":"image_url","image_url":{"url":"https://cdn.discordapp.com/test.png"}}]}`)
+
+	var message Message
+	require.NoError(t, json.Unmarshal(data, &message))
+	require.Equal(t, "user", message.Role)
+	require.Equal(t, "look", message.Content)
+	require.Len(t, message.Parts, 1)
+	require.Equal(t, "image_url", message.Parts[0].Type)
+	require.Equal(t, "https://cdn.discordapp.com/test.png", message.Parts[0].ImageURL.URL)
+}
+
 func TestChatPrependsSystemPrompt(t *testing.T) {
 	var got chatRequest
 

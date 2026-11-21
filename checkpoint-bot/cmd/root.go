@@ -73,6 +73,10 @@ func init() {
 	viper.SetDefault("MEMORY_BATCH_SECONDS", 60)
 	viper.SetDefault("MEMORY_MAX_BATCH_MESSAGES", 20)
 	viper.SetDefault("MEMORY_IGNORE_CHANNELS", "")
+	viper.SetDefault("VISION_ENABLED", true)
+	viper.SetDefault("VISION_MAX_IMAGES", 4)
+	viper.SetDefault("VISION_MAX_IMAGE_MB", 8)
+	viper.SetDefault("VISION_DETAIL", "auto")
 
 	rootCmd.PersistentFlags().String("TOKEN", "", "Discord bot token (required)")
 	rootCmd.PersistentFlags().String("LOG_FORMAT", "", "Log format: text or json (auto json on Railway)")
@@ -103,4 +107,8 @@ func init() {
 	rootCmd.PersistentFlags().Int("MEMORY_BATCH_SECONDS", 60, "Batch window for passive memory")
 	rootCmd.PersistentFlags().Int("MEMORY_MAX_BATCH_MESSAGES", 20, "Maximum messages per user batch")
 	rootCmd.PersistentFlags().String("MEMORY_IGNORE_CHANNELS", "", "Comma-separated channel IDs to ignore for passive memory")
+	rootCmd.PersistentFlags().Bool("VISION_ENABLED", true, "Enable image understanding for attachments")
+	rootCmd.PersistentFlags().Int("VISION_MAX_IMAGES", 4, "Maximum images per chat request")
+	rootCmd.PersistentFlags().Int("VISION_MAX_IMAGE_MB", 8, "Maximum image size in MB")
+	rootCmd.PersistentFlags().String("VISION_DETAIL", "auto", "Image detail: auto, low, high, or original")
 }

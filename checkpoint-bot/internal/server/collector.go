@@ -84,6 +84,9 @@ func (c *passiveCollector) Handle(s *discordgo.Session, m *discordgo.MessageCrea
 	if c.cfg.IgnoreChannels[m.ChannelID] {
 		return
 	}
+	if strings.TrimSpace(m.Content) == "" {
+		return
+	}
 	if messageText(m.Message) == "" {
 		return
 	}
