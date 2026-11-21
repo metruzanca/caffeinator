@@ -57,15 +57,19 @@ func (f *fakeChatSession) ChannelMessageSendComplex(channelID string, data *disc
 }
 
 type fakeExtractor struct {
-	calls  int
-	facts  []memory.Fact
-	err    error
-	gotTxt string
+	calls       int
+	facts       []memory.Fact
+	err         error
+	gotTxt      string
+	gotTexts    []string
+	gotSubjects []map[string]string
 }
 
 func (f *fakeExtractor) Extract(ctx context.Context, transcript string, subjects map[string]string) ([]memory.Fact, error) {
 	f.calls++
 	f.gotTxt = transcript
+	f.gotTexts = append(f.gotTexts, transcript)
+	f.gotSubjects = append(f.gotSubjects, subjects)
 	return f.facts, f.err
 }
 

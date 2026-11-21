@@ -55,6 +55,7 @@ type ChatConfig struct {
 	Extractor             memoryExtractor
 	MemoryMaxContextChars int
 	MemoryExtractTimeout  time.Duration
+	PassiveMemory         bool
 }
 
 // Chat handles messages that mention the bot or reply to it.
@@ -162,7 +163,7 @@ func (c *Chat) respond(m *discordgo.MessageCreate, referenced *discordgo.Message
 	stopTyping := c.startTyping(m.ChannelID)
 	defer stopTyping()
 
-	content, err := c.generate(context.Background(), m, referenced, c.cfg.ContextMessages, true, botID, prompt)
+	content, err := c.generate(context.Background(), m, referenced, c.cfg.ContextMessages, true, !c.cfg.PassiveMemory, botID, prompt)
 	if err != nil {
 		log.Error("chat request failed",
 			"err", err,
@@ -208,10 +209,10 @@ func (c *Chat) Ask(ctx context.Context, req commands.ChatRequest) (string, error
 		Content:   text,
 	}}
 
-	return c.generate(ctx, message, nil, historyLength, !req.DisableMemory, req.BotID, text)
+	return c.generate(ctx, message, nil, historyLength, !req.DisableMemory, true, req.BotID, text)
 }
 
-func (c *Chat) generate(ctx context.Context, m *discordgo.MessageCreate, referenced *discordgo.Message, historyLength int, useMemory bool, botID, prompt string) (string, error) {
+func (c *Chat) generate(ctx context.Context, m *discordgo.MessageCreate, referenced *discordgo.Message, historyLength int, useMemory, extractMemory bool, botID, prompt string) (string, error) {
 	select {
 	case c.sem <- struct{}{}:
 		defer func() { <-c.sem }()
@@ -279,7 +280,7 @@ func (c *Chat) generate(ctx context.Context, m *discordgo.MessageCreate, referen
 		"web_search_requests", usage.ServerToolUseDetails.WebSearchRequests,
 	)
 
-	if useMemory && c.memory != nil && c.extractor != nil {
+	if extractMemory && useMemory && c.memory != nil && c.extractor != nil {
 		subjects := extractionSubjects(m, botID)
 		if len(subjects) > 0 {
 			transcript := buildSelfTranscript(history, m, prompt)

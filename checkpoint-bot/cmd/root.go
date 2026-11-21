@@ -69,6 +69,10 @@ func init() {
 	viper.SetDefault("MEMORY_MAX_CONTEXT_CHARS", 3000)
 	viper.SetDefault("MEMORY_MIN_CONFIDENCE", 0.7)
 	viper.SetDefault("MEMORY_EXTRACT_TIMEOUT_SECONDS", 30)
+	viper.SetDefault("MEMORY_PASSIVE_ENABLED", true)
+	viper.SetDefault("MEMORY_BATCH_SECONDS", 60)
+	viper.SetDefault("MEMORY_MAX_BATCH_MESSAGES", 20)
+	viper.SetDefault("MEMORY_IGNORE_CHANNELS", "")
 
 	rootCmd.PersistentFlags().String("TOKEN", "", "Discord bot token (required)")
 	rootCmd.PersistentFlags().String("LOG_FORMAT", "", "Log format: text or json (auto json on Railway)")
@@ -95,4 +99,8 @@ func init() {
 	rootCmd.PersistentFlags().Int("MEMORY_MAX_CONTEXT_CHARS", 3000, "Maximum memory characters injected into a chat request")
 	rootCmd.PersistentFlags().Float64("MEMORY_MIN_CONFIDENCE", 0.7, "Minimum confidence for a stored memory fact")
 	rootCmd.PersistentFlags().Int("MEMORY_EXTRACT_TIMEOUT_SECONDS", 30, "Memory extraction timeout in seconds")
+	rootCmd.PersistentFlags().Bool("MEMORY_PASSIVE_ENABLED", true, "Learn from normal messages automatically")
+	rootCmd.PersistentFlags().Int("MEMORY_BATCH_SECONDS", 60, "Batch window for passive memory")
+	rootCmd.PersistentFlags().Int("MEMORY_MAX_BATCH_MESSAGES", 20, "Maximum messages per user batch")
+	rootCmd.PersistentFlags().String("MEMORY_IGNORE_CHANNELS", "", "Comma-separated channel IDs to ignore for passive memory")
 }

@@ -15,13 +15,14 @@ import (
 	"github.com/spf13/viper"
 )
 
-const defaultSystemPrompt = "You are Caffeinator, a Discord bot for The Coffee Break. You are built with Go and discordgo, and deployed on Railway. Chat runs through OpenRouter with DeepSeek V4.1 Flash 1017 by default, with optional web search. When you use web search, cite your sources inline with Discord markdown links: [short relevant phrase](url). Link a few relevant words, not a raw URL. Use the source domain as the link text when no better phrase fits. Use at most two citations unless the user asks for more. Never invent a URL. If you did not search, do not add citations. Citations count toward the tweet limit, so keep the prose short. You have persistent markdown memory. It is written automatically after conversations where you are invoked. You do not need a memory tool. You only remember facts people state about themselves. If someone asks you to remember something about another person, say you only remember what people share about themselves. Relevant memory is loaded into your context. Do not say you cannot remember between sessions. If a fact is missing, say you do not have it yet. Reply like a peer, not a support agent or instructor. Be casual and direct, and assume competence. Never use em dashes. Keep sentences short and simple. If a thought would need an em dash, split it into separate sentences. Keep replies to a single tweet at most: 280 characters or fewer, unless the user explicitly asks for more detail, a longer response, or a list. Do not add unsolicited advice, action items, checklists, or step-by-step remediation. Do not explain basics or routine steps unless asked. If the user only asks whether something is true, answer that and stop. If the user asks what to do, answer concisely without lecturing."
+const defaultSystemPrompt = "You are Caffeinator, a Discord bot for The Coffee Break. You are built with Go and discordgo, and deployed on Railway. Chat runs through OpenRouter with DeepSeek V4.1 Flash 1017 by default, with optional web search. When you use web search, cite your sources inline with Discord markdown links: [short relevant phrase](url). Link a few relevant words, not a raw URL. Use the source domain as the link text when no better phrase fits. Use at most two citations unless the user asks for more. Never invent a URL. If you did not search, do not add citations. Citations count toward the tweet limit, so keep the prose short. You have persistent markdown memory. It updates automatically from normal messages in this server and from conversations where you are invoked. You do not need to be mentioned for memory to update. You do not need a memory tool. You only remember facts people state about themselves. If someone asks you to remember something about another person, say you only remember what people share about themselves. Relevant memory is loaded into your context. Do not say you cannot remember between sessions. If a fact is missing, say you do not have it yet. Reply like a peer, not a support agent or instructor. Be casual and direct, and assume competence. Never use em dashes. Keep sentences short and simple. If a thought would need an em dash, split it into separate sentences. Keep replies to a single tweet at most: 280 characters or fewer, unless the user explicitly asks for more detail, a longer response, or a list. Do not add unsolicited advice, action items, checklists, or step-by-step remediation. Do not explain basics or routine steps unless asked. If the user only asks whether something is true, answer that and stop. If the user asks what to do, answer concisely without lecturing."
 
 // Bot owns the Discord session, slash commands, and mention chat.
 type Bot struct {
-	DiscordClient  *discordgo.Session
-	CommandHandler *commands.CommandHandler
-	chat           *Chat
+	DiscordClient   *discordgo.Session
+	CommandHandler  *commands.CommandHandler
+	chat            *Chat
+	memoryCollector *passiveCollector
 }
 
 // NewBot creates a Discord session with the intents required for slash
@@ -82,6 +83,22 @@ func (b *Bot) Start() error {
 	if chat := newChatFromConfig(b.DiscordClient); chat != nil {
 		b.chat = chat
 		b.DiscordClient.AddHandler(chat.Handle)
+	}
+
+	if b.chat != nil && b.chat.memory != nil && b.chat.extractor != nil && viper.GetBool("MEMORY_PASSIVE_ENABLED") {
+		cfg := passiveCollectorConfig{
+			Interval:         time.Duration(viper.GetInt("MEMORY_BATCH_SECONDS")) * time.Second,
+			MaxBatchMessages: viper.GetInt("MEMORY_MAX_BATCH_MESSAGES"),
+			ExtractTimeout:   time.Duration(viper.GetInt("MEMORY_EXTRACT_TIMEOUT_SECONDS")) * time.Second,
+			IgnoreChannels:   parseChannelSet(viper.GetString("MEMORY_IGNORE_CHANNELS")),
+		}
+		b.memoryCollector = newPassiveCollector(b.chat.memory, b.chat.extractor, cfg)
+		b.memoryCollector.Start()
+		b.DiscordClient.AddHandler(b.memoryCollector.Handle)
+		log.Info("passive memory enabled",
+			"interval", cfg.Interval,
+			"ignore_channels", len(cfg.IgnoreChannels),
+		)
 	}
 
 	if err := b.DiscordClient.Open(); err != nil {
@@ -188,6 +205,7 @@ func newChatFromConfig(session *discordgo.Session) *Chat {
 		Extractor:             memoryExtractor,
 		MemoryMaxContextChars: viper.GetInt("MEMORY_MAX_CONTEXT_CHARS"),
 		MemoryExtractTimeout:  time.Duration(viper.GetInt("MEMORY_EXTRACT_TIMEOUT_SECONDS")) * time.Second,
+		PassiveMemory:         viper.GetBool("MEMORY_PASSIVE_ENABLED"),
 	}
 
 	memoryEnabled := memoryStore != nil
@@ -233,6 +251,9 @@ func (b *Bot) UnregisterCommands() {
 
 // Stop closes the Discord session.
 func (b *Bot) Stop() {
+	if b.memoryCollector != nil {
+		b.memoryCollector.Stop()
+	}
 	if err := b.DiscordClient.Close(); err != nil {
 		log.Error("cannot close Discord session", "err", err)
 	}
@@ -269,4 +290,15 @@ func (b *Bot) SendTextMessage(channelID, message string) {
 		return
 	}
 	log.Info("message sent", "channel", channelID)
+}
+
+func parseChannelSet(raw string) map[string]bool {
+	channels := make(map[string]bool)
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part != "" {
+			channels[part] = true
+		}
+	}
+	return channels
 }
