@@ -152,10 +152,20 @@ func (c *RedditClient) Top(ctx context.Context, subreddit, period string, limit 
 	if err != nil {
 		return nil, err
 	}
+	if len(posts) == 0 && isRedditAgeGate(body) {
+		return nil, errors.New("this subreddit is age restricted: set MEMES_INCLUDE_NSFW=true")
+	}
 	for i := range posts {
 		posts[i].Subreddit = subreddit
 	}
 	return posts, nil
+}
+
+func isRedditAgeGate(body []byte) bool {
+	text := strings.ToLower(string(body))
+	return strings.Contains(text, "over18-gate") ||
+		strings.Contains(text, "<title>over 18</title>") ||
+		strings.Contains(text, "are you over 18")
 }
 
 func (c *RedditClient) get(ctx context.Context, endpoint, accept string, maxBytes int64) ([]byte, error) {

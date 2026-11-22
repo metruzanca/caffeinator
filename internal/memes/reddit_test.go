@@ -122,6 +122,23 @@ func TestRedditTopDetectsLoginRedirect(t *testing.T) {
 	require.ErrorIs(t, err, ErrRedditSession)
 }
 
+func TestRedditTopDetectsAgeGate(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, _ = w.Write([]byte(`<html><body><div class="over18-gate">are you over 18</div></body></html>`))
+	}))
+	defer server.Close()
+
+	client := NewRedditClient(RedditConfig{
+		BaseURL: server.URL,
+		Session: "secret",
+		MinGap:  0,
+	})
+
+	_, err := client.Top(context.Background(), "ProgrammerHumor", "week", 5)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "age restricted")
+}
+
 func TestRedditTopHandlesRateLimit(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusTooManyRequests)

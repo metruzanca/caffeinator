@@ -390,6 +390,8 @@ func TestAskInjectsRelevantMemesAndStripsMarker(t *testing.T) {
 	require.Equal(t, 1, response.Stats.MemeCandidates)
 	require.Contains(t, client.systemPrompt, "Meme memory")
 	require.Contains(t, client.systemPrompt, "abc123")
+	require.Contains(t, client.systemPrompt, "Tags: build, ci")
+	require.Contains(t, client.systemPrompt, "Fits: someone celebrates a passing build")
 
 	memes := store.List()
 	require.Len(t, memes, 1)

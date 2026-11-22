@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -30,6 +31,15 @@ func testMeme(id string, added time.Time) Meme {
 		ImageFile: id + ".jpg",
 		AddedAt:   added,
 	}
+}
+
+func TestMemeStoreAcceptsEmptyFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "memes.json")
+	require.NoError(t, os.WriteFile(path, nil, 0600))
+
+	store, err := NewMemeStore(path)
+	require.NoError(t, err)
+	require.Equal(t, 0, store.Status().Stored)
 }
 
 func TestMemeStoreAddAndReload(t *testing.T) {
@@ -216,6 +226,7 @@ func TestMemeStorePruneEvictsUnreactedFirst(t *testing.T) {
 	store := newTestMemeStore(t, now)
 
 	plain := testMeme("plain", now.Add(-3*time.Hour))
+	plain.Uses = 4
 	liked := testMeme("liked", now.Add(-48*time.Hour))
 	liked.ReactorIDs = []string{"1"}
 	liked.Reactions = 1

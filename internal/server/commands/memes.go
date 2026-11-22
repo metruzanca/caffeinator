@@ -93,21 +93,25 @@ func refreshMemes(h *CommandHandler, s *discordgo.Session, i *discordgo.Interact
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
-	defer cancel()
+	log.Info("meme refresh started", "channel", i.ChannelID, "user", interactionUserID(i))
 
-	text, err := h.Memes.Refresh(ctx)
-	if err != nil {
-		log.Error("meme refresh failed", "err", err, "channel", i.ChannelID)
-		editInteractionError(s, i, "Meme refresh failed: "+err.Error())
-		return
-	}
-	if strings.TrimSpace(text) == "" {
-		text = "Meme refresh finished."
-	}
-	if err := sendInteractionContent(h, s, i, ChatReply{Text: text}); err != nil {
-		log.Error("cannot send meme refresh result", "err", err, "channel", i.ChannelID)
-	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+		defer cancel()
+
+		text, err := h.Memes.Refresh(ctx)
+		if err != nil {
+			log.Error("meme refresh failed", "err", err, "channel", i.ChannelID)
+			editInteractionError(s, i, "Meme refresh failed: "+err.Error())
+			return
+		}
+		if strings.TrimSpace(text) == "" {
+			text = "Meme refresh finished."
+		}
+		if err := sendInteractionContent(h, s, i, ChatReply{Text: text}); err != nil {
+			log.Error("cannot send meme refresh result", "err", err, "channel", i.ChannelID)
+		}
+	}()
 }
 
 func init() {

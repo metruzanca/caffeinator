@@ -16,7 +16,7 @@ session cookie is required.
 4. Set `REDDIT_SESSION` to that value.
 
 Both the bare value and a full `reddit_session=...` cookie header are accepted.
-The cookie is never logged.
+Treat the cookie like a password. The bot never logs it.
 
 ## Schedule
 

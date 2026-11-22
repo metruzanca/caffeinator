@@ -1,6 +1,7 @@
 package agent
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,11 +16,9 @@ import (
 
 const (
 	defaultMemeLimit       = 3
-	defaultMemeMaxStored   = 50
-	defaultMemeRetention   = 30 * 24 * time.Hour
 	memeRelevanceThreshold = 3
 	memeShareHistory       = 5
-	memeContextLineChars   = 240
+	memeContextLineChars   = 400
 )
 
 var memeMarkerPattern = regexp.MustCompile(`\[meme:([^\]\s]+)\]`)
@@ -89,8 +88,10 @@ func NewMemeStore(path string) (*MemeStore, error) {
 	data, err := os.ReadFile(path)
 	switch {
 	case err == nil:
-		if err := json.Unmarshal(data, &store.doc); err != nil {
-			return nil, fmt.Errorf("cannot read meme memory: %w", err)
+		if len(bytes.TrimSpace(data)) > 0 {
+			if err := json.Unmarshal(data, &store.doc); err != nil {
+				return nil, fmt.Errorf("cannot read meme memory: %w", err)
+			}
 		}
 	case errors.Is(err, os.ErrNotExist):
 	default:
@@ -337,8 +338,8 @@ func (s *MemeStore) AddReaction(id, userID string) (Meme, bool, error) {
 	return Meme{}, false, nil
 }
 
-// Prune removes unused old memes and enforces the stored cap. Reacted memes
-// survive age pruning and are evicted last when the cap is reached.
+// Prune removes unused old memes and enforces the stored cap. Reacted or used
+// memes survive age pruning and are evicted last when the cap is reached.
 func (s *MemeStore) Prune(retentionDays, maxStored int) ([]Meme, error) {
 	if s == nil {
 		return nil, errors.New("meme memory is disabled")
@@ -367,8 +368,8 @@ func (s *MemeStore) Prune(retentionDays, maxStored int) ([]Meme, error) {
 
 	if maxStored > 0 && len(kept) > maxStored {
 		sort.SliceStable(kept, func(i, j int) bool {
-			left := kept[i].Reactions*10 + kept[i].Uses*3
-			right := kept[j].Reactions*10 + kept[j].Uses*3
+			left := kept[i].Reactions*100 + kept[i].Uses*3
+			right := kept[j].Reactions*100 + kept[j].Uses*3
 			if left != right {
 				return left < right
 			}

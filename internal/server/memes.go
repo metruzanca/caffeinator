@@ -347,8 +347,14 @@ func (s memeCommandService) ListText(limit int) string {
 		if meme.Uses > 0 {
 			fmt.Fprintf(&builder, ", used %d times", meme.Uses)
 		}
+		if meme.Score > 0 {
+			fmt.Fprintf(&builder, ", %d upvotes", meme.Score)
+		}
 		builder.WriteString("\n   ")
 		builder.WriteString(truncateRunes(meme.Title, 120))
+		if len(meme.Tags) > 0 {
+			builder.WriteString(" [" + strings.Join(meme.Tags, ", ") + "]")
+		}
 		builder.WriteString("\n   ")
 		builder.WriteString(truncateRunes(strings.TrimSpace(meme.Caption+" "+meme.Context), 220))
 		if meme.Link != "" {
