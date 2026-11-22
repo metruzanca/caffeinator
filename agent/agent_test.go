@@ -2,6 +2,7 @@ package agent
 
 import (
 	"context"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -347,4 +348,101 @@ func TestLearnSkipsBotsAndNonNumericSubjects(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, facts)
 	require.False(t, strings.Contains(client.got, "hello"))
+}
+
+func TestAskInjectsRelevantMemesAndStripsMarker(t *testing.T) {
+	now := time.Date(2026, 11, 21, 12, 0, 0, 0, time.UTC)
+	store, err := NewMemeStore(filepath.Join(t.TempDir(), "memes.json"))
+	require.NoError(t, err)
+	store.now = func() time.Time { return now }
+
+	added, err := store.Add(Meme{
+		ID:        "abc123",
+		Title:     "When the build passes",
+		Caption:   "A programmer looks surprised at a green build.",
+		Context:   "It jokes about clean first builds.",
+		Tags:      []string{"build", "ci"},
+		UseWhen:   []string{"someone celebrates a passing build"},
+		AddedAt:   now,
+		ImageFile: "abc123.png",
+	})
+	require.NoError(t, err)
+	require.True(t, added)
+
+	client := &fakeCompleter{response: "That is a classic. [meme:abc123]"}
+	a := New(Config{
+		Client:       client,
+		SystemPrompt: "base prompt",
+		Memes:        store,
+		MemeLimit:    3,
+	})
+
+	response, err := a.Ask(context.Background(), Request{
+		Self:      User{ID: "bot"},
+		User:      User{ID: "123", Name: "Alice"},
+		Prompt:    "my build keeps failing",
+		UseMemory: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "That is a classic.", response.Text)
+	require.Len(t, response.Memes, 1)
+	require.Equal(t, "abc123", response.Memes[0].ID)
+	require.Equal(t, 1, response.Stats.MemeCandidates)
+	require.Contains(t, client.systemPrompt, "Meme memory")
+	require.Contains(t, client.systemPrompt, "abc123")
+
+	memes := store.List()
+	require.Len(t, memes, 1)
+	require.Equal(t, 1, memes[0].Uses)
+}
+
+func TestAskSkipsMemesWhenMemoryDisabled(t *testing.T) {
+	now := time.Date(2026, 11, 21, 12, 0, 0, 0, time.UTC)
+	store, err := NewMemeStore(filepath.Join(t.TempDir(), "memes.json"))
+	require.NoError(t, err)
+	store.now = func() time.Time { return now }
+	_, err = store.Add(Meme{
+		ID:      "abc123",
+		Title:   "Build meme",
+		Caption: "A build meme.",
+		Tags:    []string{"build"},
+		AddedAt: now,
+	})
+	require.NoError(t, err)
+
+	client := &fakeCompleter{response: "plain answer"}
+	a := New(Config{
+		Client:       client,
+		SystemPrompt: "base prompt",
+		Memes:        store,
+	})
+
+	response, err := a.Ask(context.Background(), Request{
+		Self:      User{ID: "bot"},
+		User:      User{ID: "123", Name: "Alice"},
+		Prompt:    "my build keeps failing",
+		UseMemory: false,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "plain answer", response.Text)
+	require.Empty(t, response.Memes)
+	require.NotContains(t, client.systemPrompt, "Meme memory")
+}
+
+func TestAskStripsUnknownMemeMarkers(t *testing.T) {
+	client := &fakeCompleter{response: "hello [meme:unknown]"}
+	a := New(Config{
+		Client:       client,
+		SystemPrompt: "base prompt",
+	})
+
+	response, err := a.Ask(context.Background(), Request{
+		Self:      User{ID: "bot"},
+		User:      User{ID: "123", Name: "Alice"},
+		Prompt:    "what now",
+		UseMemory: true,
+	})
+	require.NoError(t, err)
+	require.Equal(t, "hello", response.Text)
+	require.Empty(t, response.Memes)
 }
