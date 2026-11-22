@@ -28,7 +28,8 @@ MEMES_TIMEZONE=UTC
 ```
 
 That runs Monday, Wednesday, and Friday at 15:00 UTC. Use `/memes refresh` to
-run immediately.
+run immediately. `MEMES_SUBREDDITS` takes names, `r/` names, or full subreddit
+URLs, for example `https://reddit.com/r/ProgrammerHumor/top/?t=week`.
 
 The scraper reads `MEMES_TOP_PERIOD` from the subreddit top listing. The default
 is `week`, matching `https://reddit.com/r/ProgrammerHumor/top/?t=week`.

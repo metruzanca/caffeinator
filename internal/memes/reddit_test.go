@@ -156,6 +156,12 @@ func TestRedditTopHandlesRateLimit(t *testing.T) {
 	require.NotErrorIs(t, err, ErrRedditSession)
 }
 
+func TestNormalizeSubreddit(t *testing.T) {
+	require.Equal(t, "programmerhumor", normalizeSubreddit("ProgrammerHumor"))
+	require.Equal(t, "programmerhumor", normalizeSubreddit("r/ProgrammerHumor"))
+	require.Equal(t, "programmerhumor", normalizeSubreddit("https://reddit.com/r/ProgrammerHumor/top/?t=week"))
+}
+
 func TestRedditCookieAcceptsFullHeader(t *testing.T) {
 	client := NewRedditClient(RedditConfig{Session: "reddit_session=abc; other=1", IncludeNSFW: true})
 	require.Contains(t, client.cookie(), "reddit_session=abc")

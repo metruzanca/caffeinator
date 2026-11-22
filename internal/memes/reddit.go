@@ -258,7 +258,26 @@ func (c *RedditClient) cookie() string {
 }
 
 func normalizeSubreddit(name string) string {
-	name = strings.ToLower(strings.TrimSpace(name))
+	name = strings.TrimSpace(name)
+	lower := strings.ToLower(name)
+	if strings.Contains(lower, "://") || strings.HasPrefix(lower, "reddit.com") ||
+		strings.HasPrefix(lower, "www.reddit.com") || strings.HasPrefix(lower, "old.reddit.com") {
+		raw := name
+		if !strings.Contains(raw, "://") {
+			raw = "https://" + raw
+		}
+		if parsed, err := url.Parse(raw); err == nil {
+			parts := strings.Split(strings.Trim(parsed.Path, "/"), "/")
+			for i, part := range parts {
+				if strings.EqualFold(part, "r") && i+1 < len(parts) {
+					name = parts[i+1]
+					break
+				}
+			}
+		}
+	}
+
+	name = strings.ToLower(name)
 	name = strings.TrimPrefix(name, "/")
 	name = strings.TrimPrefix(name, "r/")
 	return strings.Trim(name, "/")
