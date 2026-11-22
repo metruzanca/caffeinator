@@ -4,15 +4,19 @@
 
 ```text
 .
+├── agent/                     # AI engine, no Discord or project-internal imports
+│   ├── agent.go               # Prompt assembly, memory injection, model calls
+│   ├── openrouter.go          # OpenRouter chat client
+│   ├── image.go               # OpenRouter image client
+│   ├── memory.go              # Markdown memory store
+│   ├── extractor.go           # Fact extraction
+│   └── message.go             # User, turn, attachment, and image types
 ├── docs/                      # Feature and configuration docs
 ├── internal/
 │   ├── config/                # Viper, dotenv, branding, logging
-│   ├── imagegen/              # OpenRouter image generation client
-│   ├── llm/                   # OpenRouter chat client
-│   ├── memory/                # Markdown memory store and extraction
 │   ├── ratelimit/             # Shared token bucket limiter
 │   ├── reminders/             # Reminder store, parser, recurrence, scheduler
-│   ├── server/                # Bot lifecycle and chat pipeline
+│   ├── server/                # Discord adapter and bot lifecycle
 │   │   └── commands/          # Slash commands
 │   ├── util/                  # Small helpers
 │   └── version/               # Build metadata
@@ -30,7 +34,9 @@ go test ./...
 go vet ./...
 ```
 
-The suite covers context assembly, mention detection, `/ask`, memory storage and extraction, image generation request and response handling, reminders and recurrence, response chunking, rate limiting, and the OpenRouter clients. Tests use `httptest` and never call live APIs.
+The suite covers agent prompt assembly, mention detection, `/ask`, memory storage and extraction, image generation request and response handling, reminders and recurrence, response chunking, rate limiting, and the OpenRouter clients. Tests use `httptest` and never call live APIs.
+
+`agent/` is the AI engine and must stay free of Discord types. `internal/server/` wires it to discordgo.
 
 ## Local run
 

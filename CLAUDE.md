@@ -20,12 +20,13 @@
 - Commands: `internal/server/commands/*.go`
 - Command registration: `internal/server/commands/commands.go`
 - Bot lifecycle: `internal/server/bot.go`
-- Chat pipeline: `internal/server/chat.go`
-- Memory store and extraction: `internal/memory/`
+- Discord chat adapter: `internal/server/chat.go`
+- Agent prompt pipeline: `agent/agent.go`
+- Memory store and extraction: `agent/memory.go` and `agent/extractor.go`
 - Reminder store, parser, scheduler: `internal/reminders/`
 - Reminder Discord integration: `internal/server/reminders.go`
-- OpenRouter chat client: `internal/llm/openrouter.go`
-- OpenRouter image client: `internal/imagegen/openrouter.go`
+- OpenRouter chat client: `agent/openrouter.go`
+- OpenRouter image client: `agent/image.go`
 - Rate limiter: `internal/ratelimit/ratelimit.go`
 - Configuration: `internal/config/config.go` and `internal/config/defaults.go`
 - Docs: `README.md` and `docs/`. Keep the README short and put details in `docs/`.
@@ -43,6 +44,8 @@ go test ./...
 ## Architecture
 
 The bot has no database, ORM, migration tool, or `go generate` step. Persistent state is markdown memory on disk.
+
+The `agent/` package is the AI engine. It handles OpenRouter chat and image calls, prompt assembly, memory, and extraction. It must not import `discordgo`, `internal/*`, Viper, or the project logger. `internal/server/` is the Discord adapter: it fetches Discord messages, maps them to `agent.Turn`, sends replies, and logs. `internal/reminders/` is an app feature that uses `agent.ChatClient` for parsing and writing.
 
 Features:
 
@@ -128,7 +131,7 @@ Handler rules:
 
 ## Chat Pipeline
 
-Location: `internal/server/chat.go`
+Location: `agent/agent.go` for prompt building and `internal/server/chat.go` for Discord wiring.
 
 Entry points:
 
@@ -188,7 +191,7 @@ Response rules:
 
 ## Vision
 
-Location: `internal/server/vision.go`
+Location: `internal/server/vision.go` for Discord attachment checks, `agent/agent.go` for content parts.
 
 - Attach images from the current message and the replied-to message.
 - Do not attach images from older context messages.
@@ -226,7 +229,7 @@ Location: `internal/reminders/` and `internal/server/reminders.go`
 
 ## Image Generation
 
-Location: `internal/imagegen/` and `internal/server/commands/imagine.go`
+Location: `agent/image.go` and `internal/server/commands/imagine.go`
 
 - Uses the OpenRouter Image API at `POST /api/v1/images`.
 - Default model is `black-forest-labs/flux-3-image-klein`.
@@ -240,9 +243,9 @@ Location: `internal/imagegen/` and `internal/server/commands/imagine.go`
 - `IMAGE_SAFETY_TOLERANCE` sets the default, default `2`. Users can pass `0-4` per request in any channel.
 - Flux 3 Image allows `0-4`. Sending above the model max returns 422.
 - Higher tolerance does not allow illegal content.
-- Detect `imagegen.ContentBlockedError` and show the provider reason.
-- Detect `imagegen.ProviderError` and show the provider reason.
-- Detect `imagegen.RateLimitError`. Read `Retry-After` first, then a duration in the provider message, then guess 30 seconds.
+- Detect `agent.ContentBlockedError` and show the provider reason.
+- Detect `agent.ProviderError` and show the provider reason.
+- Detect `agent.RateLimitError`. Read `Retry-After` first, then a duration in the provider message, then guess 30 seconds.
 - The default limit is 20 images per user per hour. Users start with a full bucket, then refill one image every 3 minutes.
 - Show local and provider rate limits with a Discord relative timestamp, for example `<t:1234567890:R>`.
 - `ratelimit.Limiter.RetryAfter` reports when the next token is available. Use it for the per-user limit.
@@ -253,7 +256,7 @@ Location: `internal/imagegen/` and `internal/server/commands/imagine.go`
 
 ## Memory
 
-Location: `internal/memory/`
+Location: `agent/memory.go` and `agent/extractor.go`. Discord collection stays in `internal/server/collector.go`.
 
 Memory is read-only from the model's perspective. The model never writes files directly.
 
@@ -301,7 +304,7 @@ Rules:
 
 ## LLM Client
 
-Location: `internal/llm/openrouter.go`
+Location: `agent/openrouter.go`
 
 - OpenAI-compatible `POST /chat/completions` at OpenRouter.
 - A system prompt is prepended when configured. The bot uses a default peer-tone prompt that states its stack, keeps sentences simple, bans em dashes, and limits replies to 280 characters.
@@ -312,7 +315,8 @@ Location: `internal/llm/openrouter.go`
 - Retry once on network errors, `429`, and `5xx`.
 - Never log the API key.
 - Return clear errors that include status and a short response body.
-- Keep the client independent of Discord types so it can be tested with `httptest`.
+- Keep the agent package independent of Discord types so it can be tested with `httptest`.
+- `agent` methods do not log. They return usage, stats, and errors. The Discord adapter logs.
 
 ---
 
@@ -342,10 +346,10 @@ Configuration uses Viper and dotenv. It is environment-only, with no command-lin
 ## Testing
 
 - Prefer pure functions for logic that can be tested without Discord.
-- Use interfaces for Discord and LLM dependencies in `chat.go`.
-- Use `httptest` for the OpenRouter chat and image clients.
+- Use interfaces for Discord dependencies in `chat.go` and for model calls in `agent/agent.go`.
+- Use `httptest` for the OpenRouter chat and image clients in `agent/`.
 - Do not call live Discord or OpenRouter APIs in tests.
-- Test the memory store with `t.TempDir()`.
+- Test the memory store in `agent/` with `t.TempDir()`.
 - Test extraction with a fake chat client.
 - Test reminder recurrence with fixed times and IANA timezones.
 - Test the reminder store and scheduler with `t.TempDir()` and a fake trigger.
