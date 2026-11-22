@@ -89,7 +89,7 @@ Everything works with defaults. Change only what you need.
 | `OPENROUTER_MODEL` | `deepseek/deepseek-v4.1-flash-1017` | Chat model. |
 | `IMAGE_MODEL` | `black-forest-labs/flux-3-image-klein` | Image model. |
 
-Feature toggles: `CHAT_ENABLED`, `VISION_ENABLED`, `IMAGE_ENABLED`, `REMINDERS_ENABLED`, and `MEMORY_ENABLED`.
+Feature toggles: `CHAT_ENABLED`, `VISION_ENABLED`, `IMAGE_ENABLED`, `REMINDERS_ENABLED`, `MEMORY_ENABLED`, and `MEMES_ENABLED`.
 
 The real Discord username, avatar, and description are set in the Discord Developer Portal. `BOT_NAME` only changes how the bot talks about itself.
 
