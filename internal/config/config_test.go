@@ -46,4 +46,7 @@ func TestLoadConfig_Defaults(t *testing.T) {
 	assert.Equal(t, DefaultBotName, viper.GetString("BOT_NAME"))
 	assert.Equal(t, true, viper.GetBool("CHAT_ENABLED"))
 	assert.Equal(t, "auto", viper.GetString("VISION_DETAIL"))
+	assert.Equal(t, true, viper.GetBool("MEMES_ENABLED"))
+	assert.Equal(t, "week", viper.GetString("MEMES_TOP_PERIOD"))
+	assert.Equal(t, "0 15 * * 1,3,5", viper.GetString("MEMES_CRON"))
 }

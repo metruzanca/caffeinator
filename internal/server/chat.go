@@ -44,6 +44,8 @@ type ChatConfig struct {
 	RateLimitCapacity    int
 	RateLimitWindow      time.Duration
 	Memory               *agent.Store
+	Memes                *agent.MemeStore
+	MemeDir              string
 	MemoryExtractTimeout time.Duration
 	PassiveMemory        bool
 	VisionEnabled        bool
@@ -150,7 +152,7 @@ func (c *Chat) handle(m *discordgo.MessageCreate, botID string, serverAdmin bool
 func (c *Chat) respond(m *discordgo.MessageCreate, referenced *discordgo.Message, mentioned bool, botID string, serverAdmin bool) {
 	prompt := cleanContent(m, botID, mentioned)
 	if prompt == "" && len(m.Attachments) == 0 {
-		c.send(m, "What's up?")
+		c.send(m, "What's up?", nil)
 		return
 	}
 
@@ -190,7 +192,7 @@ func (c *Chat) respond(m *discordgo.MessageCreate, referenced *discordgo.Message
 			"channel", m.ChannelID,
 			"user", m.Author.ID,
 		)
-		c.send(m, "My brain is offline right now. Try again in a bit.")
+		c.send(m, "My brain is offline right now. Try again in a bit.", nil)
 		return
 	}
 
@@ -207,18 +209,18 @@ func (c *Chat) respond(m *discordgo.MessageCreate, referenced *discordgo.Message
 		go c.learn(learningTurns, req.User, serverAdmin)
 	}
 
-	c.send(m, response.Text)
+	c.send(m, response.Text, response.Memes)
 }
 
 // Ask runs the chat pipeline for a slash command interaction.
-func (c *Chat) Ask(ctx context.Context, req commands.ChatRequest) (string, error) {
+func (c *Chat) Ask(ctx context.Context, req commands.ChatRequest) (commands.ChatReply, error) {
 	if c == nil {
-		return "", errors.New("chat is disabled")
+		return commands.ChatReply{}, errors.New("chat is disabled")
 	}
 
 	text := strings.TrimSpace(req.Text)
 	if text == "" {
-		return "", errors.New("text is empty")
+		return commands.ChatReply{}, errors.New("text is empty")
 	}
 
 	historyLength := req.HistoryLength
@@ -257,7 +259,7 @@ func (c *Chat) Ask(ctx context.Context, req commands.ChatRequest) (string, error
 	started := time.Now()
 	response, err := c.agent.Ask(ctx, areq)
 	if err != nil {
-		return "", err
+		return commands.ChatReply{}, err
 	}
 
 	log.Info("ask response",
@@ -278,7 +280,7 @@ func (c *Chat) Ask(ctx context.Context, req commands.ChatRequest) (string, error
 		go c.learn(learningTurns, author, false)
 	}
 
-	return response.Text, nil
+	return commands.ChatReply{Text: response.Text, Memes: response.Memes}, nil
 }
 
 func (c *Chat) learn(turns []agent.Turn, user agent.User, includeServer bool) {
@@ -308,6 +310,8 @@ func logResponse(m *discordgo.MessageCreate, started time.Time, response agent.R
 		"assistant_messages", response.Stats.AssistantMessages,
 		"context_chars", response.Stats.ContextChars,
 		"memory_subjects", response.Stats.MemorySubjects,
+		"meme_candidates", response.Stats.MemeCandidates,
+		"memes_used", len(response.Memes),
 		"prompt_tokens", response.Usage.PromptTokens,
 		"completion_tokens", response.Usage.CompletionTokens,
 		"web_search_requests", response.Usage.ServerToolUseDetails.WebSearchRequests,
@@ -567,11 +571,20 @@ func (c *Chat) startTyping(channelID string) func() {
 	}
 }
 
-func (c *Chat) send(m *discordgo.MessageCreate, content string) {
+func (c *Chat) send(m *discordgo.MessageCreate, content string, selected []agent.Meme) {
+	var file *discordgo.File
+	memeID := ""
+	if len(selected) > 0 {
+		file, memeID, _ = loadMemeImage(c.cfg.MemeDir, selected)
+	}
+
 	chunks := splitMessage(content, discordMessageLimit, c.cfg.MaxChunks)
 	if len(chunks) == 0 {
-		log.Warn("empty chat response", "channel", m.ChannelID, "user", m.Author.ID)
-		return
+		if file == nil {
+			log.Warn("empty chat response", "channel", m.ChannelID, "user", m.Author.ID)
+			return
+		}
+		chunks = []string{""}
 	}
 
 	failIfNotExists := false
@@ -586,17 +599,27 @@ func (c *Chat) send(m *discordgo.MessageCreate, content string) {
 			}
 		}
 
-		_, err := c.session.ChannelMessageSendComplex(m.ChannelID, &discordgo.MessageSend{
+		message := &discordgo.MessageSend{
 			Content:   chunk,
 			Reference: reference,
 			AllowedMentions: &discordgo.MessageAllowedMentions{
 				Parse:       []discordgo.AllowedMentionType{discordgo.AllowedMentionTypeUsers},
 				RepliedUser: false,
 			},
-		})
+		}
+		if index == 0 && file != nil {
+			message.Files = []*discordgo.File{file}
+		}
+
+		sent, err := c.session.ChannelMessageSendComplex(m.ChannelID, message)
 		if err != nil {
 			log.Error("cannot send chat response", "err", err, "channel", m.ChannelID)
 			return
+		}
+		if index == 0 && file != nil && memeID != "" && c.cfg.Memes != nil && sent != nil {
+			if err := c.cfg.Memes.MarkShared(memeID, m.ChannelID, sent.ID); err != nil {
+				log.Warn("cannot record shared meme", "meme", memeID, "err", err)
+			}
 		}
 	}
 }

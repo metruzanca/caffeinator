@@ -27,9 +27,22 @@ type ChatRequest struct {
 	DisableMemory bool
 }
 
+// ChatReply is a chat response, optionally with a meme to attach.
+type ChatReply struct {
+	Text  string
+	Memes []agent.Meme
+}
+
 // ChatService is the chat pipeline used by slash commands.
 type ChatService interface {
-	Ask(ctx context.Context, req ChatRequest) (string, error)
+	Ask(ctx context.Context, req ChatRequest) (ChatReply, error)
+}
+
+// MemeService inspects and refreshes meme memory.
+type MemeService interface {
+	StatusText() string
+	Refresh(ctx context.Context) (string, error)
+	ListText(limit int) string
 }
 
 // MemoryService is the memory store used by the memory command.
@@ -59,6 +72,9 @@ type CommandHandler struct {
 	DiscordClient          *discordgo.Session
 	Chat                   ChatService
 	Memory                 MemoryService
+	Memes                  MemeService
+	MemeStore              *agent.MemeStore
+	MemeDir                string
 	Images                 ImageService
 	Reminders              ReminderService
 	ImageLimiter           *ratelimit.Limiter

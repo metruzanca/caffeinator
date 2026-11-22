@@ -511,7 +511,11 @@ func (s *MemeStore) cleanMeme(meme Meme) Meme {
 	meme.Caption = truncateRunes(strings.TrimSpace(sanitizeMemeText(meme.Caption)), 240)
 	meme.Context = truncateRunes(strings.TrimSpace(sanitizeMemeText(meme.Context)), 480)
 	meme.Link = strings.TrimSpace(meme.Link)
-	meme.ImageFile = filepath.Base(strings.TrimSpace(meme.ImageFile))
+	if name := strings.TrimSpace(meme.ImageFile); name != "" {
+		meme.ImageFile = filepath.Base(name)
+	} else {
+		meme.ImageFile = ""
+	}
 	meme.Tags = cleanMemeList(meme.Tags, 8, 32)
 	meme.UseWhen = cleanMemeList(meme.UseWhen, 4, 80)
 	if meme.AddedAt.IsZero() {

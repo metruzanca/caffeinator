@@ -1,12 +1,14 @@
 package commands
 
 import (
+	"bytes"
 	"context"
 	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/charmbracelet/log"
+	"github.com/metruzanca/caffeinator/internal/memes"
 )
 
 // AskCmd runs the chat pipeline with configurable history and memory.
@@ -95,7 +97,7 @@ var AskCmd = &Command{
 			"memory_disabled", disableMemory,
 		)
 
-		content, err := h.Chat.Ask(ctx, ChatRequest{
+		reply, err := h.Chat.Ask(ctx, ChatRequest{
 			GuildID:       i.GuildID,
 			ChannelID:     i.ChannelID,
 			UserID:        userID,
@@ -111,7 +113,7 @@ var AskCmd = &Command{
 			return
 		}
 
-		if err := sendInteractionContent(s, i, content); err != nil {
+		if err := sendInteractionContent(h, s, i, reply); err != nil {
 			log.Error("cannot send ask response", "err", err, "channel", i.ChannelID)
 		}
 	},
@@ -131,10 +133,33 @@ func botID(s *discordgo.Session) string {
 	return s.State.User.ID
 }
 
-func sendInteractionContent(s *discordgo.Session, i *discordgo.InteractionCreate, content string) error {
-	chunks := splitResponse(content, 2000, 3)
+func sendInteractionContent(h *CommandHandler, s *discordgo.Session, i *discordgo.InteractionCreate, reply ChatReply) error {
+	chunks := splitResponse(reply.Text, 2000, 3)
+
+	var file *discordgo.File
+	memeID := ""
+	if len(reply.Memes) > 0 && h.MemeDir != "" {
+		meme := reply.Memes[0]
+		memeID = meme.ID
+		data, mediaType, err := memes.LoadImageFile(h.MemeDir, meme.ImageFile)
+		if err != nil {
+			log.Warn("cannot load meme image", "meme", meme.ID, "err", err)
+			memeID = ""
+		} else {
+			file = &discordgo.File{
+				Name:        meme.ImageFile,
+				ContentType: mediaType,
+				Reader:      bytes.NewReader(data),
+			}
+		}
+	}
+
 	if len(chunks) == 0 {
-		chunks = []string{"..."}
+		if file == nil {
+			chunks = []string{"..."}
+		} else {
+			chunks = []string{""}
+		}
 	}
 
 	first := chunks[0]
@@ -142,11 +167,21 @@ func sendInteractionContent(s *discordgo.Session, i *discordgo.InteractionCreate
 		Parse:       []discordgo.AllowedMentionType{discordgo.AllowedMentionTypeUsers},
 		RepliedUser: false,
 	}
-	if _, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+	edit := &discordgo.WebhookEdit{
 		Content:         &first,
 		AllowedMentions: allowedMentions,
-	}); err != nil {
+	}
+	if file != nil {
+		edit.Files = []*discordgo.File{file}
+	}
+	sent, err := s.InteractionResponseEdit(i.Interaction, edit)
+	if err != nil {
 		return err
+	}
+	if file != nil && memeID != "" && h.MemeStore != nil && sent != nil {
+		if err := h.MemeStore.MarkShared(memeID, i.ChannelID, sent.ID); err != nil {
+			log.Warn("cannot record shared meme", "meme", memeID, "err", err)
+		}
 	}
 
 	for _, chunk := range chunks[1:] {

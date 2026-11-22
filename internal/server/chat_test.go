@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -52,7 +53,7 @@ func (f *fakeChatSession) ChannelMessageSendComplex(channelID string, data *disc
 	if f.sentCh != nil {
 		f.sentCh <- data
 	}
-	return &discordgo.Message{}, nil
+	return &discordgo.Message{ID: fmt.Sprintf("sent-%d", len(f.sent))}, nil
 }
 
 type learnedCall struct {
@@ -328,7 +329,7 @@ func TestSendAllowsUserMentionsAndReferencesMessage(t *testing.T) {
 	session := &fakeChatSession{sentCh: make(chan *discordgo.MessageSend, 1)}
 	chat := newChat(session, &fakeAgent{}, ChatConfig{})
 
-	chat.send(testMessage("42", "channel", "guild", "alice", "<@bot> hi"), "@everyone hello")
+	chat.send(testMessage("42", "channel", "guild", "alice", "<@bot> hi"), "@everyone hello", nil)
 
 	select {
 	case sent := <-session.sentCh:
@@ -348,7 +349,7 @@ func TestAskUsesMemory(t *testing.T) {
 	ai := &fakeAgent{response: "hello", asked: make(chan agent.Request, 1)}
 	chat := newChat(&fakeChatSession{}, ai, ChatConfig{ContextMessages: 10})
 
-	content, err := chat.Ask(context.Background(), commands.ChatRequest{
+	reply, err := chat.Ask(context.Background(), commands.ChatRequest{
 		GuildID:       "guild",
 		ChannelID:     "channel",
 		UserID:        "123",
@@ -358,7 +359,7 @@ func TestAskUsesMemory(t *testing.T) {
 		HistoryLength: 10,
 	})
 	require.NoError(t, err)
-	require.Equal(t, "hello", content)
+	require.Equal(t, "hello", reply.Text)
 
 	req := <-ai.asked
 	require.True(t, req.UseMemory)
