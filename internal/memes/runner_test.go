@@ -189,6 +189,11 @@ func TestRunnerPrunesOldMemesAndImages(t *testing.T) {
 	require.ErrorIs(t, err, os.ErrNotExist)
 }
 
+func TestFormatResult(t *testing.T) {
+	require.Equal(t, "Added 1 new meme.", FormatResult(Result{Added: 1}))
+	require.Equal(t, "Added 2 new memes. Retired 1 old meme.", FormatResult(Result{Added: 2, Pruned: 1}))
+}
+
 func TestRunnerRequiresSubreddits(t *testing.T) {
 	store, err := agent.NewMemeStore(filepath.Join(t.TempDir(), "memes.json"))
 	require.NoError(t, err)

@@ -377,7 +377,7 @@ func isImageFileName(name string) bool {
 
 // FormatResult describes one refresh for a Discord reply.
 func FormatResult(result Result) string {
-	parts := []string{fmt.Sprintf("Added %d new memes.", result.Added)}
+	parts := []string{fmt.Sprintf("Added %d new meme%s.", result.Added, plural(result.Added))}
 	if result.Skipped > 0 {
 		parts = append(parts, fmt.Sprintf("Skipped %d already stored.", result.Skipped))
 	}
@@ -385,7 +385,14 @@ func FormatResult(result Result) string {
 		parts = append(parts, fmt.Sprintf("%d failed.", result.Failed))
 	}
 	if result.Pruned > 0 {
-		parts = append(parts, fmt.Sprintf("Retired %d old memes.", result.Pruned))
+		parts = append(parts, fmt.Sprintf("Retired %d old meme%s.", result.Pruned, plural(result.Pruned)))
 	}
 	return strings.Join(parts, " ")
+}
+
+func plural(count int) string {
+	if count == 1 {
+		return ""
+	}
+	return "s"
 }
