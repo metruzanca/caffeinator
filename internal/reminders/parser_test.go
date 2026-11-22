@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/metruzanca/caffeinator/internal/llm"
+	"github.com/metruzanca/caffeinator/agent"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,11 +15,11 @@ type fakeParserClient struct {
 	err      error
 }
 
-func (f *fakeParserClient) Chat(ctx context.Context, messages []llm.Message) (string, llm.Usage, error) {
+func (f *fakeParserClient) Chat(ctx context.Context, messages []agent.Message) (string, agent.Usage, error) {
 	if f.err != nil {
-		return "", llm.Usage{}, f.err
+		return "", agent.Usage{}, f.err
 	}
-	return f.response, llm.Usage{}, nil
+	return f.response, agent.Usage{}, nil
 }
 
 func TestParserParseCreate(t *testing.T) {

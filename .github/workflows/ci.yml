@@ -23,6 +23,13 @@ jobs:
       - name: Check formatting
         run: test -z "$(gofmt -l .)"
 
+      - name: Check agent boundary
+        run: |
+          if go list -deps ./agent | grep -E '^(github.com/metruzanca/caffeinator/internal|github.com/bwmarrin/discordgo|github.com/charmbracelet/log|github.com/spf13/viper)'; then
+            echo "agent must not depend on Discord, internal packages, charmbracelet/log, or Viper"
+            exit 1
+          fi
+
       - name: Vet
         run: go vet ./...
 

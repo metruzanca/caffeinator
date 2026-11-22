@@ -1,4 +1,4 @@
-package memory
+package agent
 
 import (
 	"context"
@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-
-	"github.com/metruzanca/caffeinator/internal/llm"
 )
 
 // ExtractionSystemPrompt is the system prompt used to extract durable facts.
@@ -26,20 +24,20 @@ Do not extract secrets, credentials, tokens, addresses, health data, or other se
 Do not extract transient plans or small talk.
 If nothing is worth remembering, return {"facts":[]}.`
 
-// ChatClient is the small LLM surface needed by the extractor.
-type ChatClient interface {
-	Chat(ctx context.Context, messages []llm.Message) (string, llm.Usage, error)
+// ChatCaller is the small chat surface needed by the extractor.
+type ChatCaller interface {
+	Chat(ctx context.Context, messages []Message) (string, Usage, error)
 }
 
 // Extractor turns a transcript into durable facts.
 type Extractor struct {
-	client        ChatClient
+	client        ChatCaller
 	minConfidence float64
 	maxFacts      int
 }
 
 // NewExtractor creates an extractor.
-func NewExtractor(client ChatClient, minConfidence float64) *Extractor {
+func NewExtractor(client ChatCaller, minConfidence float64) *Extractor {
 	if minConfidence <= 0 || minConfidence > 1 {
 		minConfidence = 0.7
 	}
@@ -93,7 +91,7 @@ func (e *Extractor) Extract(ctx context.Context, transcript string, subjects map
 	builder.WriteString("\nTranscript:\n")
 	builder.WriteString(transcript)
 
-	content, _, err := e.client.Chat(ctx, []llm.Message{{
+	content, _, err := e.client.Chat(ctx, []Message{{
 		Role:    "user",
 		Content: builder.String(),
 	}})

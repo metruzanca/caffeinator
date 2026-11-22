@@ -2,7 +2,6 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"sort"
 	"strings"
 	"sync"
@@ -10,52 +9,50 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/charmbracelet/log"
-	"github.com/metruzanca/caffeinator/internal/memory"
+	"github.com/metruzanca/caffeinator/agent"
 )
 
 type passiveCollectorConfig struct {
 	Interval         time.Duration
 	MaxBatchMessages int
-	MaxTranscript    int
 	ExtractTimeout   time.Duration
 	IgnoreChannels   map[string]bool
 }
 
-type passiveCollector struct {
-	store     *memory.Store
-	extractor memoryExtractor
-	cfg       passiveCollectorConfig
+type memoryLearner interface {
+	Learn(ctx context.Context, turns []agent.Turn, subject agent.User, includeServer bool) ([]agent.Fact, error)
+}
 
-	messages chan *discordgo.MessageCreate
+type passiveCollector struct {
+	learner memoryLearner
+	cfg     passiveCollectorConfig
+
+	messages chan agent.Turn
 	stop     chan struct{}
 	done     chan struct{}
 
 	mu      sync.Mutex
-	pending map[string][]*discordgo.MessageCreate
+	pending map[string][]agent.Turn
 }
 
-func newPassiveCollector(store *memory.Store, extractor memoryExtractor, cfg passiveCollectorConfig) *passiveCollector {
+func newPassiveCollector(learner memoryLearner, cfg passiveCollectorConfig) *passiveCollector {
 	if cfg.Interval <= 0 {
 		cfg.Interval = 60 * time.Second
 	}
 	if cfg.MaxBatchMessages <= 0 {
 		cfg.MaxBatchMessages = 20
 	}
-	if cfg.MaxTranscript <= 0 {
-		cfg.MaxTranscript = maxTranscriptChars
-	}
 	if cfg.ExtractTimeout <= 0 {
 		cfg.ExtractTimeout = 30 * time.Second
 	}
 
 	return &passiveCollector{
-		store:     store,
-		extractor: extractor,
-		cfg:       cfg,
-		messages:  make(chan *discordgo.MessageCreate, 1000),
-		stop:      make(chan struct{}),
-		done:      make(chan struct{}),
-		pending:   make(map[string][]*discordgo.MessageCreate),
+		learner:  learner,
+		cfg:      cfg,
+		messages: make(chan agent.Turn, 1000),
+		stop:     make(chan struct{}),
+		done:     make(chan struct{}),
+		pending:  make(map[string][]agent.Turn),
 	}
 }
 
@@ -87,12 +84,9 @@ func (c *passiveCollector) Handle(s *discordgo.Session, m *discordgo.MessageCrea
 	if strings.TrimSpace(m.Content) == "" {
 		return
 	}
-	if messageText(m.Message) == "" {
-		return
-	}
 
 	select {
-	case c.messages <- m:
+	case c.messages <- toAgentTurn(m.Message):
 	default:
 		log.Warn("passive memory queue full", "channel", m.ChannelID, "user", m.Author.ID)
 	}
@@ -109,8 +103,8 @@ func (c *passiveCollector) run() {
 			c.drain()
 			c.flush()
 			return
-		case m := <-c.messages:
-			c.add(m)
+		case turn := <-c.messages:
+			c.add(turn)
 		case <-ticker.C:
 			c.flush()
 		}
@@ -120,33 +114,33 @@ func (c *passiveCollector) run() {
 func (c *passiveCollector) drain() {
 	for {
 		select {
-		case m := <-c.messages:
-			c.add(m)
+		case turn := <-c.messages:
+			c.add(turn)
 		default:
 			return
 		}
 	}
 }
 
-func (c *passiveCollector) add(m *discordgo.MessageCreate) {
-	if m == nil || m.Author == nil {
+func (c *passiveCollector) add(turn agent.Turn) {
+	if turn.Author.ID == "" {
 		return
 	}
 
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	batch := append(c.pending[m.Author.ID], m)
+	batch := append(c.pending[turn.Author.ID], turn)
 	if len(batch) > c.cfg.MaxBatchMessages {
 		batch = batch[len(batch)-c.cfg.MaxBatchMessages:]
 	}
-	c.pending[m.Author.ID] = batch
+	c.pending[turn.Author.ID] = batch
 }
 
 func (c *passiveCollector) flush() {
 	c.mu.Lock()
 	pending := c.pending
-	c.pending = make(map[string][]*discordgo.MessageCreate)
+	c.pending = make(map[string][]agent.Turn)
 	c.mu.Unlock()
 
 	ids := make([]string, 0, len(pending))
@@ -160,62 +154,27 @@ func (c *passiveCollector) flush() {
 	}
 }
 
-func (c *passiveCollector) process(authorID string, messages []*discordgo.MessageCreate) {
-	if len(messages) == 0 {
+func (c *passiveCollector) process(authorID string, turns []agent.Turn) {
+	if len(turns) == 0 {
 		return
 	}
 
-	author := messages[len(messages)-1].Author
-	if author == nil {
-		return
-	}
-
-	transcript := buildPassiveTranscript(messages, c.cfg.MaxTranscript)
-	if transcript == "" {
+	author := turns[len(turns)-1].Author
+	if author.ID == "" {
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), c.cfg.ExtractTimeout)
 	defer cancel()
 
-	facts, err := c.extractor.Extract(ctx, transcript, map[string]string{
-		authorID: displayName(author),
-	})
+	facts, err := c.learner.Learn(ctx, turns, author, false)
 	if err != nil {
 		log.Error("passive memory extraction failed", "err", err, "user", authorID)
 		return
 	}
-
-	filtered := facts[:0]
-	for _, fact := range facts {
-		if fact.SubjectID == authorID {
-			filtered = append(filtered, fact)
-		}
-	}
-	if len(filtered) == 0 {
-		log.Debug("passive memory found nothing", "user", authorID, "messages", len(messages))
+	if len(facts) == 0 {
+		log.Debug("passive memory found nothing", "user", authorID, "messages", len(turns))
 		return
 	}
-	if err := c.store.AppendFacts(filtered); err != nil {
-		log.Error("cannot store passive memory", "err", err, "user", authorID)
-		return
-	}
-	log.Info("passive memory updated", "user", authorID, "facts", len(filtered), "messages", len(messages))
-}
-
-func buildPassiveTranscript(messages []*discordgo.MessageCreate, maxChars int) string {
-	var builder strings.Builder
-
-	for _, m := range messages {
-		if m == nil || m.Message == nil || m.Author == nil {
-			continue
-		}
-		text := messageText(m.Message)
-		if text == "" {
-			continue
-		}
-		fmt.Fprintf(&builder, "%s (%s): %s\n", displayName(m.Author), m.Author.ID, truncateRunes(text, 2000))
-	}
-
-	return tailRunes(builder.String(), maxChars)
+	log.Info("passive memory updated", "user", authorID, "facts", len(facts), "messages", len(turns))
 }

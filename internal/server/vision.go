@@ -7,10 +7,10 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/charmbracelet/log"
-	"github.com/metruzanca/caffeinator/internal/llm"
+	"github.com/metruzanca/caffeinator/agent"
 )
 
-func (c *Chat) visionParts(current *discordgo.MessageCreate, referenced *discordgo.Message) []llm.ContentPart {
+func (c *Chat) visionImages(current *discordgo.MessageCreate, referenced *discordgo.Message) []agent.Image {
 	if !c.cfg.VisionEnabled {
 		return nil
 	}
@@ -19,7 +19,7 @@ func (c *Chat) visionParts(current *discordgo.MessageCreate, referenced *discord
 	maxBytes := int64(c.cfg.VisionMaxImageMB) * 1024 * 1024
 	images := 0
 
-	parts := make([]llm.ContentPart, 0, maxImages*2)
+	result := make([]agent.Image, 0, maxImages)
 	add := func(attachments []*discordgo.MessageAttachment, label string) {
 		for _, attachment := range attachments {
 			if images >= maxImages {
@@ -43,16 +43,10 @@ func (c *Chat) visionParts(current *discordgo.MessageCreate, referenced *discord
 				continue
 			}
 
-			parts = append(parts, llm.ContentPart{
-				Type: "text",
-				Text: fmt.Sprintf("%s: %s", label, attachment.Filename),
-			})
-			parts = append(parts, llm.ContentPart{
-				Type: "image_url",
-				ImageURL: &llm.ImageURL{
-					URL:    imageURL,
-					Detail: c.cfg.VisionDetail,
-				},
+			result = append(result, agent.Image{
+				Label:  fmt.Sprintf("%s: %s", label, attachment.Filename),
+				URL:    imageURL,
+				Detail: c.cfg.VisionDetail,
 			})
 			images++
 		}
@@ -65,7 +59,7 @@ func (c *Chat) visionParts(current *discordgo.MessageCreate, referenced *discord
 		add(referenced.Attachments, "Referenced message image")
 	}
 
-	return parts
+	return result
 }
 
 func supportedImageType(contentType string) bool {

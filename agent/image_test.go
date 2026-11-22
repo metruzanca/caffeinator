@@ -1,4 +1,4 @@
-package imagegen
+package agent
 
 import (
 	"context"
@@ -38,14 +38,14 @@ func TestGenerateBuildsRequest(t *testing.T) {
 	defer server.Close()
 
 	tolerance := 5
-	client := &Client{
+	client := &ImageClient{
 		APIKey:     "test-key",
 		Model:      "black-forest-labs/flux-3-image-klein",
 		BaseURL:    server.URL,
 		HTTPClient: server.Client(),
 	}
 
-	result, err := client.Generate(context.Background(), Request{
+	result, err := client.Generate(context.Background(), ImageRequest{
 		Prompt:           "turn this into watercolor",
 		Resolution:       "1K",
 		AspectRatio:      "1:1",
@@ -85,14 +85,14 @@ func TestGenerateOmitsProviderOptionsForOtherModels(t *testing.T) {
 	defer server.Close()
 
 	tolerance := 5
-	client := &Client{
+	client := &ImageClient{
 		APIKey:     "test-key",
 		Model:      "bytedance-seed/seedream-5-0-flash",
 		BaseURL:    server.URL,
 		HTTPClient: server.Client(),
 	}
 
-	_, err := client.Generate(context.Background(), Request{
+	_, err := client.Generate(context.Background(), ImageRequest{
 		Prompt:          "hello",
 		SafetyTolerance: &tolerance,
 	})
@@ -107,14 +107,14 @@ func TestGenerateAPIError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ImageClient{
 		APIKey:     "test-key",
 		Model:      "model",
 		BaseURL:    server.URL,
 		HTTPClient: server.Client(),
 	}
 
-	_, err := client.Generate(context.Background(), Request{Prompt: "hello"})
+	_, err := client.Generate(context.Background(), ImageRequest{Prompt: "hello"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "bad prompt")
 }
@@ -126,14 +126,14 @@ func TestGenerateContentBlockedSexual(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ImageClient{
 		APIKey:     "test-key",
 		Model:      "black-forest-labs/flux-3-image-klein",
 		BaseURL:    server.URL,
 		HTTPClient: server.Client(),
 	}
 
-	_, err := client.Generate(context.Background(), Request{Prompt: "hello"})
+	_, err := client.Generate(context.Background(), ImageRequest{Prompt: "hello"})
 	require.Error(t, err)
 	require.ErrorIs(t, err, ErrContentBlocked)
 
@@ -150,14 +150,14 @@ func TestGenerateContentBlockedOther(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ImageClient{
 		APIKey:     "test-key",
 		Model:      "black-forest-labs/flux-3-image-klein",
 		BaseURL:    server.URL,
 		HTTPClient: server.Client(),
 	}
 
-	_, err := client.Generate(context.Background(), Request{Prompt: "hello"})
+	_, err := client.Generate(context.Background(), ImageRequest{Prompt: "hello"})
 	require.Error(t, err)
 
 	var blocked *ContentBlockedError
@@ -172,14 +172,14 @@ func TestGenerateNonModerationError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ImageClient{
 		APIKey:     "test-key",
 		Model:      "black-forest-labs/flux-3-image-klein",
 		BaseURL:    server.URL,
 		HTTPClient: server.Client(),
 	}
 
-	_, err := client.Generate(context.Background(), Request{Prompt: "hello"})
+	_, err := client.Generate(context.Background(), ImageRequest{Prompt: "hello"})
 	require.Error(t, err)
 	require.NotErrorIs(t, err, ErrContentBlocked)
 
@@ -195,14 +195,14 @@ func TestGenerateRateLimitFromStatus(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ImageClient{
 		APIKey:     "test-key",
 		Model:      "black-forest-labs/flux-3-image-klein",
 		BaseURL:    server.URL,
 		HTTPClient: server.Client(),
 	}
 
-	_, err := client.Generate(context.Background(), Request{Prompt: "hello"})
+	_, err := client.Generate(context.Background(), ImageRequest{Prompt: "hello"})
 	require.Error(t, err)
 
 	var rateErr *RateLimitError
@@ -218,14 +218,14 @@ func TestGenerateRateLimitParsesMessageDuration(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ImageClient{
 		APIKey:     "test-key",
 		Model:      "black-forest-labs/flux-3-image-klein",
 		BaseURL:    server.URL,
 		HTTPClient: server.Client(),
 	}
 
-	_, err := client.Generate(context.Background(), Request{Prompt: "hello"})
+	_, err := client.Generate(context.Background(), ImageRequest{Prompt: "hello"})
 	require.Error(t, err)
 
 	var rateErr *RateLimitError
@@ -240,14 +240,14 @@ func TestGenerateRateLimitWithoutHint(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ImageClient{
 		APIKey:     "test-key",
 		Model:      "black-forest-labs/flux-3-image-klein",
 		BaseURL:    server.URL,
 		HTTPClient: server.Client(),
 	}
 
-	_, err := client.Generate(context.Background(), Request{Prompt: "hello"})
+	_, err := client.Generate(context.Background(), ImageRequest{Prompt: "hello"})
 	require.Error(t, err)
 
 	var rateErr *RateLimitError
@@ -256,8 +256,8 @@ func TestGenerateRateLimitWithoutHint(t *testing.T) {
 }
 
 func TestGenerateRequiresPrompt(t *testing.T) {
-	client := &Client{APIKey: "test-key", Model: "model"}
-	_, err := client.Generate(context.Background(), Request{Prompt: "  "})
+	client := &ImageClient{APIKey: "test-key", Model: "model"}
+	_, err := client.Generate(context.Background(), ImageRequest{Prompt: "  "})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "prompt")
 }
@@ -269,14 +269,14 @@ func TestGenerateNoImages(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ImageClient{
 		APIKey:     "test-key",
 		Model:      "model",
 		BaseURL:    server.URL,
 		HTTPClient: server.Client(),
 	}
 
-	_, err := client.Generate(context.Background(), Request{Prompt: "hello"})
+	_, err := client.Generate(context.Background(), ImageRequest{Prompt: "hello"})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "no images")
 }
@@ -292,13 +292,13 @@ func TestGenerateRespectsContextCancel(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Millisecond)
 	defer cancel()
 
-	client := &Client{
+	client := &ImageClient{
 		APIKey:     "test-key",
 		Model:      "model",
 		BaseURL:    server.URL,
 		HTTPClient: server.Client(),
 	}
 
-	_, err := client.Generate(ctx, Request{Prompt: "hello"})
+	_, err := client.Generate(ctx, ImageRequest{Prompt: "hello"})
 	require.Error(t, err)
 }

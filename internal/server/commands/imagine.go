@@ -13,7 +13,7 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/charmbracelet/log"
-	"github.com/metruzanca/caffeinator/internal/imagegen"
+	"github.com/metruzanca/caffeinator/agent"
 )
 
 // ImagineCmd generates images with OpenRouter.
@@ -144,7 +144,7 @@ var ImagineCmd = &Command{
 		}
 
 		started := time.Now()
-		result, err := h.Images.Generate(ctx, imagegen.Request{
+		result, err := h.Images.Generate(ctx, agent.ImageRequest{
 			Prompt:           prompt,
 			Resolution:       resolution,
 			AspectRatio:      aspectRatio,
@@ -228,7 +228,7 @@ func supportedReferenceType(contentType string) bool {
 	}
 }
 
-func sendGeneratedImages(s *discordgo.Session, i *discordgo.InteractionCreate, prompt string, images []imagegen.Output) error {
+func sendGeneratedImages(s *discordgo.Session, i *discordgo.InteractionCreate, prompt string, images []agent.ImageOutput) error {
 	if len(images) == 0 {
 		return fmt.Errorf("no images to send")
 	}
@@ -266,7 +266,7 @@ func imageCaption(prompt string) string {
 	return strings.TrimSpace(prompt)
 }
 
-func imageFiles(images []imagegen.Output) []*discordgo.File {
+func imageFiles(images []agent.ImageOutput) []*discordgo.File {
 	files := make([]*discordgo.File, 0, len(images))
 	for index, image := range images {
 		files = append(files, &discordgo.File{
@@ -301,7 +301,7 @@ func discordRetryTimestamp(wait time.Duration) string {
 }
 
 func imageGenerationErrorMessage(err error) string {
-	var blocked *imagegen.ContentBlockedError
+	var blocked *agent.ContentBlockedError
 	if errors.As(err, &blocked) {
 		reason := strings.TrimSpace(blocked.Reason)
 		if reason == "" {
@@ -310,7 +310,7 @@ func imageGenerationErrorMessage(err error) string {
 		return "Blocked by the image provider: " + reason
 	}
 
-	var rateErr *imagegen.RateLimitError
+	var rateErr *agent.RateLimitError
 	if errors.As(err, &rateErr) {
 		wait := rateErr.RetryAfter
 		if wait <= 0 {
@@ -323,7 +323,7 @@ func imageGenerationErrorMessage(err error) string {
 		return message
 	}
 
-	var providerErr *imagegen.ProviderError
+	var providerErr *agent.ProviderError
 	if errors.As(err, &providerErr) {
 		reason := strings.TrimSpace(providerErr.Reason)
 		if reason == "" {

@@ -1,4 +1,4 @@
-package llm
+package agent
 
 import (
 	"context"
@@ -41,7 +41,7 @@ func TestChatSendsMessagesWithoutSystemPrompt(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ChatClient{
 		APIKey:     "test-key",
 		Model:      "deepseek/deepseek-v4.1-flash-1017",
 		BaseURL:    server.URL,
@@ -124,7 +124,7 @@ func TestChatPrependsSystemPrompt(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ChatClient{
 		APIKey:       "test-key",
 		Model:        "deepseek/deepseek-v4.1-flash-1017",
 		BaseURL:      server.URL,
@@ -152,7 +152,7 @@ func TestChatWithSystemOverridesPrompt(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ChatClient{
 		APIKey:       "test-key",
 		Model:        "deepseek/deepseek-v4.1-flash-1017",
 		BaseURL:      server.URL,
@@ -179,7 +179,7 @@ func TestChatAddsResponseFormat(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ChatClient{
 		APIKey:         "test-key",
 		Model:          "deepseek/deepseek-v4.1-flash-1017",
 		BaseURL:        server.URL,
@@ -208,7 +208,7 @@ func TestChatAddsWebSearchTool(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ChatClient{
 		APIKey:              "test-key",
 		Model:               "deepseek/deepseek-v4.1-flash-1017",
 		BaseURL:             server.URL,
@@ -240,7 +240,7 @@ func TestChatOmitsWebSearchToolWhenDisabled(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ChatClient{
 		APIKey:     "test-key",
 		Model:      "deepseek/deepseek-v4.1-flash-1017",
 		BaseURL:    server.URL,
@@ -263,7 +263,7 @@ func TestChatReturnsAPIErrorWithoutRetry(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ChatClient{
 		APIKey:     "test-key",
 		Model:      "bad-model",
 		BaseURL:    server.URL,
@@ -291,7 +291,7 @@ func TestChatRetriesServerError(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ChatClient{
 		APIKey:     "test-key",
 		Model:      "model",
 		BaseURL:    server.URL,
@@ -314,7 +314,7 @@ func TestChatRejectsEmptyResponse(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ChatClient{
 		APIKey:     "test-key",
 		Model:      "model",
 		BaseURL:    server.URL,
@@ -334,7 +334,7 @@ func TestChatRejectsNoChoices(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ChatClient{
 		APIKey:     "test-key",
 		Model:      "model",
 		BaseURL:    server.URL,
@@ -359,7 +359,7 @@ func TestChatRetriesEmptyResponse(t *testing.T) {
 	}))
 	defer server.Close()
 
-	client := &Client{
+	client := &ChatClient{
 		APIKey:     "test-key",
 		Model:      "model",
 		BaseURL:    server.URL,
@@ -373,7 +373,7 @@ func TestChatRetriesEmptyResponse(t *testing.T) {
 }
 
 func TestChatRequiresAPIKey(t *testing.T) {
-	client := &Client{Model: "model"}
+	client := &ChatClient{Model: "model"}
 	_, _, err := client.Chat(context.Background(), []Message{{Role: "user", Content: "hi"}})
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "API key")

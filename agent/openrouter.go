@@ -1,5 +1,5 @@
-// Package llm provides a minimal OpenRouter chat client.
-package llm
+// Package agent provides a small OpenRouter-backed chat agent.
+package agent
 
 import (
 	"bytes"
@@ -11,8 +11,6 @@ import (
 	"net/http"
 	"strings"
 	"time"
-
-	"github.com/metruzanca/caffeinator/internal/config"
 )
 
 const (
@@ -129,9 +127,11 @@ type ResponseFormat struct {
 	Type string `json:"type"`
 }
 
-// Client calls OpenRouter's chat completions endpoint.
-type Client struct {
+// ChatClient calls OpenRouter's chat completions endpoint.
+type ChatClient struct {
 	APIKey              string
+	AppName             string
+	AppURL              string
 	Model               string
 	BaseURL             string
 	MaxTokens           int
@@ -168,12 +168,12 @@ type chatResponse struct {
 }
 
 // Chat sends the conversation to OpenRouter using the client's system prompt.
-func (c *Client) Chat(ctx context.Context, messages []Message) (string, Usage, error) {
+func (c *ChatClient) Chat(ctx context.Context, messages []Message) (string, Usage, error) {
 	return c.ChatWithSystem(ctx, c.SystemPrompt, messages)
 }
 
 // ChatWithSystem sends the conversation with the given system prompt.
-func (c *Client) ChatWithSystem(ctx context.Context, systemPrompt string, messages []Message) (string, Usage, error) {
+func (c *ChatClient) ChatWithSystem(ctx context.Context, systemPrompt string, messages []Message) (string, Usage, error) {
 	if strings.TrimSpace(c.APIKey) == "" {
 		return "", Usage{}, errors.New("openrouter API key is empty")
 	}
@@ -239,7 +239,7 @@ func (c *Client) ChatWithSystem(ctx context.Context, systemPrompt string, messag
 	return "", Usage{}, lastErr
 }
 
-func (c *Client) do(ctx context.Context, body []byte) (string, Usage, bool, error) {
+func (c *ChatClient) do(ctx context.Context, body []byte) (string, Usage, bool, error) {
 	baseURL := strings.TrimRight(c.BaseURL, "/")
 	if baseURL == "" {
 		baseURL = defaultBaseURL
@@ -251,8 +251,8 @@ func (c *Client) do(ctx context.Context, body []byte) (string, Usage, bool, erro
 	}
 	req.Header.Set("Authorization", "Bearer "+c.APIKey)
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("HTTP-Referer", config.AppURL())
-	req.Header.Set("X-Title", config.BotName())
+	req.Header.Set("HTTP-Referer", c.AppURL)
+	req.Header.Set("X-Title", c.AppName)
 
 	resp, err := c.httpClient().Do(req)
 	if err != nil {
@@ -309,7 +309,7 @@ func (c *Client) do(ctx context.Context, body []byte) (string, Usage, bool, erro
 	return content, parsed.Usage, false, nil
 }
 
-func (c *Client) httpClient() *http.Client {
+func (c *ChatClient) httpClient() *http.Client {
 	if c.HTTPClient != nil {
 		return c.HTTPClient
 	}

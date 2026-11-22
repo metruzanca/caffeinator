@@ -7,8 +7,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/charmbracelet/log"
+	"github.com/metruzanca/caffeinator/agent"
 	"github.com/metruzanca/caffeinator/internal/config"
-	"github.com/metruzanca/caffeinator/internal/imagegen"
 	"github.com/metruzanca/caffeinator/internal/ratelimit"
 )
 
@@ -42,7 +42,7 @@ type MemoryService interface {
 
 // ImageService generates images through OpenRouter.
 type ImageService interface {
-	Generate(ctx context.Context, req imagegen.Request) (imagegen.Result, error)
+	Generate(ctx context.Context, req agent.ImageRequest) (agent.ImageResult, error)
 }
 
 // ReminderService manages user timezones and reminder records.

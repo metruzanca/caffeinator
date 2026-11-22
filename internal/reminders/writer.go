@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/metruzanca/caffeinator/internal/llm"
+	"github.com/metruzanca/caffeinator/agent"
 )
 
 // WriterSystemPrompt is the system prompt for reminder message text.
@@ -29,7 +29,7 @@ func (w *Writer) Write(ctx context.Context, text string, at time.Time) (string, 
 		return "", errors.New("reminder writer is disabled")
 	}
 
-	content, _, err := w.client.Chat(ctx, []llm.Message{{
+	content, _, err := w.client.Chat(ctx, []agent.Message{{
 		Role: "user",
 		Content: fmt.Sprintf(
 			"Reminder text: %s\nScheduled time: %s",

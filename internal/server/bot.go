@@ -7,10 +7,8 @@ import (
 
 	"github.com/bwmarrin/discordgo"
 	"github.com/charmbracelet/log"
+	"github.com/metruzanca/caffeinator/agent"
 	"github.com/metruzanca/caffeinator/internal/config"
-	"github.com/metruzanca/caffeinator/internal/imagegen"
-	"github.com/metruzanca/caffeinator/internal/llm"
-	"github.com/metruzanca/caffeinator/internal/memory"
 	"github.com/metruzanca/caffeinator/internal/ratelimit"
 	"github.com/metruzanca/caffeinator/internal/reminders"
 	"github.com/metruzanca/caffeinator/internal/server/commands"
@@ -104,14 +102,14 @@ func (b *Bot) Start() error {
 		b.chat.reminders = b.reminderService
 	}
 
-	if b.chat != nil && b.chat.memory != nil && b.chat.extractor != nil && viper.GetBool("MEMORY_PASSIVE_ENABLED") {
+	if b.chat != nil && b.chat.memory != nil && b.chat.agent != nil && viper.GetBool("MEMORY_PASSIVE_ENABLED") {
 		cfg := passiveCollectorConfig{
 			Interval:         time.Duration(viper.GetInt("MEMORY_BATCH_SECONDS")) * time.Second,
 			MaxBatchMessages: viper.GetInt("MEMORY_MAX_BATCH_MESSAGES"),
 			ExtractTimeout:   time.Duration(viper.GetInt("MEMORY_EXTRACT_TIMEOUT_SECONDS")) * time.Second,
 			IgnoreChannels:   parseChannelSet(viper.GetString("MEMORY_IGNORE_CHANNELS")),
 		}
-		b.memoryCollector = newPassiveCollector(b.chat.memory, b.chat.extractor, cfg)
+		b.memoryCollector = newPassiveCollector(b.chat.agent, cfg)
 		b.memoryCollector.Start()
 		b.DiscordClient.AddHandler(b.memoryCollector.Handle)
 		log.Info("passive memory enabled",
@@ -182,11 +180,11 @@ func newChatFromConfig(session *discordgo.Session) *Chat {
 		systemPrompt = defaultSystemPrompt(model)
 	}
 
-	var memoryStore *memory.Store
-	var memoryExtractor *memory.Extractor
+	var memoryStore *agent.Store
+	var memoryExtractor *agent.Extractor
 	if viper.GetBool("MEMORY_ENABLED") {
 		var err error
-		memoryStore, err = memory.NewStore(
+		memoryStore, err = agent.NewStore(
 			viper.GetString("MEMORY_DIR"),
 			viper.GetInt("MEMORY_MAX_CONTEXT_CHARS"),
 		)
@@ -196,15 +194,17 @@ func newChatFromConfig(session *discordgo.Session) *Chat {
 		}
 	}
 	if memoryStore != nil {
-		extractorClient := &llm.Client{
+		extractorClient := &agent.ChatClient{
 			APIKey:         apiKey,
+			AppName:        config.BotName(),
+			AppURL:         config.AppURL(),
 			Model:          model,
 			BaseURL:        baseURL,
 			MaxTokens:      4096,
-			SystemPrompt:   memory.ExtractionSystemPrompt,
-			ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
+			SystemPrompt:   agent.ExtractionSystemPrompt,
+			ResponseFormat: &agent.ResponseFormat{Type: "json_object"},
 		}
-		memoryExtractor = memory.NewExtractor(extractorClient, viper.GetFloat64("MEMORY_MIN_CONFIDENCE"))
+		memoryExtractor = agent.NewExtractor(extractorClient, viper.GetFloat64("MEMORY_MIN_CONFIDENCE"))
 	}
 
 	webSearchMaxResults := viper.GetInt("OPENROUTER_WEB_SEARCH_MAX_RESULTS")
@@ -216,8 +216,10 @@ func newChatFromConfig(session *discordgo.Session) *Chat {
 		webSearchMaxUses = 2
 	}
 
-	client := &llm.Client{
+	client := &agent.ChatClient{
 		APIKey:              apiKey,
+		AppName:             config.BotName(),
+		AppURL:              config.AppURL(),
 		Model:               model,
 		BaseURL:             baseURL,
 		MaxTokens:           viper.GetInt("CHAT_MAX_TOKENS"),
@@ -227,25 +229,29 @@ func newChatFromConfig(session *discordgo.Session) *Chat {
 		WebSearchMaxUses:    webSearchMaxUses,
 	}
 
+	ai := agent.New(agent.Config{
+		Client:             client,
+		SystemPrompt:       systemPrompt,
+		Memory:             memoryStore,
+		Extractor:          memoryExtractor,
+		MaxContextChars:    viper.GetInt("CHAT_MAX_CONTEXT_CHARS"),
+		MaxCharsPerMessage: viper.GetInt("CHAT_MAX_CHARS_PER_MESSAGE"),
+		Timeout:            time.Duration(viper.GetInt("CHAT_TIMEOUT_SECONDS")) * time.Second,
+		MaxConcurrent:      viper.GetInt("CHAT_MAX_CONCURRENT"),
+	})
+
 	cfg := ChatConfig{
-		ContextMessages:       viper.GetInt("CHAT_CONTEXT_MESSAGES"),
-		MaxContextChars:       viper.GetInt("CHAT_MAX_CONTEXT_CHARS"),
-		MaxCharsPerMessage:    viper.GetInt("CHAT_MAX_CHARS_PER_MESSAGE"),
-		MaxChunks:             viper.GetInt("CHAT_MAX_CHUNKS"),
-		Timeout:               time.Duration(viper.GetInt("CHAT_TIMEOUT_SECONDS")) * time.Second,
-		RateLimitCapacity:     viper.GetInt("CHAT_RATE_LIMIT_CAPACITY"),
-		RateLimitWindow:       time.Duration(viper.GetInt("CHAT_RATE_LIMIT_SECONDS")) * time.Second,
-		MaxConcurrent:         viper.GetInt("CHAT_MAX_CONCURRENT"),
-		SystemPrompt:          systemPrompt,
-		Memory:                memoryStore,
-		Extractor:             memoryExtractor,
-		MemoryMaxContextChars: viper.GetInt("MEMORY_MAX_CONTEXT_CHARS"),
-		MemoryExtractTimeout:  time.Duration(viper.GetInt("MEMORY_EXTRACT_TIMEOUT_SECONDS")) * time.Second,
-		PassiveMemory:         viper.GetBool("MEMORY_PASSIVE_ENABLED"),
-		VisionEnabled:         viper.GetBool("VISION_ENABLED"),
-		VisionMaxImages:       viper.GetInt("VISION_MAX_IMAGES"),
-		VisionMaxImageMB:      viper.GetInt("VISION_MAX_IMAGE_MB"),
-		VisionDetail:          viper.GetString("VISION_DETAIL"),
+		ContextMessages:      viper.GetInt("CHAT_CONTEXT_MESSAGES"),
+		MaxChunks:            viper.GetInt("CHAT_MAX_CHUNKS"),
+		RateLimitCapacity:    viper.GetInt("CHAT_RATE_LIMIT_CAPACITY"),
+		RateLimitWindow:      time.Duration(viper.GetInt("CHAT_RATE_LIMIT_SECONDS")) * time.Second,
+		Memory:               memoryStore,
+		MemoryExtractTimeout: time.Duration(viper.GetInt("MEMORY_EXTRACT_TIMEOUT_SECONDS")) * time.Second,
+		PassiveMemory:        viper.GetBool("MEMORY_PASSIVE_ENABLED"),
+		VisionEnabled:        viper.GetBool("VISION_ENABLED"),
+		VisionMaxImages:      viper.GetInt("VISION_MAX_IMAGES"),
+		VisionMaxImageMB:     viper.GetInt("VISION_MAX_IMAGE_MB"),
+		VisionDetail:         viper.GetString("VISION_DETAIL"),
 	}
 
 	memoryEnabled := memoryStore != nil
@@ -263,7 +269,7 @@ func newChatFromConfig(session *discordgo.Session) *Chat {
 		"memory_enabled", memoryEnabled,
 		"memory_dir", memoryDir,
 	)
-	return newChat(session, client, cfg)
+	return newChat(session, ai, cfg)
 }
 
 func newReminderServiceFromConfig(session *discordgo.Session) (*ReminderService, *reminders.Scheduler) {
@@ -294,16 +300,20 @@ func newReminderServiceFromConfig(session *discordgo.Session) (*ReminderService,
 		baseURL = "https://openrouter.ai/api/v1"
 	}
 
-	parserClient := &llm.Client{
+	parserClient := &agent.ChatClient{
 		APIKey:         apiKey,
+		AppName:        config.BotName(),
+		AppURL:         config.AppURL(),
 		Model:          model,
 		BaseURL:        baseURL,
 		MaxTokens:      2048,
 		SystemPrompt:   reminders.ParserSystemPrompt,
-		ResponseFormat: &llm.ResponseFormat{Type: "json_object"},
+		ResponseFormat: &agent.ResponseFormat{Type: "json_object"},
 	}
-	writerClient := &llm.Client{
+	writerClient := &agent.ChatClient{
 		APIKey:       apiKey,
+		AppName:      config.BotName(),
+		AppURL:       config.AppURL(),
 		Model:        model,
 		BaseURL:      baseURL,
 		MaxTokens:    512,
@@ -336,7 +346,7 @@ func newReminderServiceFromConfig(session *discordgo.Session) (*ReminderService,
 	return service, scheduler
 }
 
-func newImageClientFromConfig() *imagegen.Client {
+func newImageClientFromConfig() *agent.ImageClient {
 	if !viper.GetBool("IMAGE_ENABLED") {
 		log.Info("image generation disabled")
 		return nil
@@ -359,8 +369,10 @@ func newImageClientFromConfig() *imagegen.Client {
 	}
 
 	log.Info("image generation enabled", "model", model)
-	return &imagegen.Client{
+	return &agent.ImageClient{
 		APIKey:  apiKey,
+		AppName: config.BotName(),
+		AppURL:  config.AppURL(),
 		Model:   model,
 		BaseURL: baseURL,
 	}

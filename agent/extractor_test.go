@@ -1,11 +1,10 @@
-package memory
+package agent
 
 import (
 	"context"
 	"errors"
 	"testing"
 
-	"github.com/metruzanca/caffeinator/internal/llm"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,14 +14,14 @@ type fakeExtractionClient struct {
 	got      string
 }
 
-func (f *fakeExtractionClient) Chat(ctx context.Context, messages []llm.Message) (string, llm.Usage, error) {
+func (f *fakeExtractionClient) Chat(ctx context.Context, messages []Message) (string, Usage, error) {
 	if len(messages) > 0 {
 		f.got = messages[0].Content
 	}
 	if f.err != nil {
-		return "", llm.Usage{}, f.err
+		return "", Usage{}, f.err
 	}
-	return f.response, llm.Usage{}, nil
+	return f.response, Usage{}, nil
 }
 
 func TestExtractorParsesFacts(t *testing.T) {

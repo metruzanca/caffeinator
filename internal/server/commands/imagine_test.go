@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/metruzanca/caffeinator/internal/imagegen"
+	"github.com/metruzanca/caffeinator/agent"
 	"github.com/stretchr/testify/require"
 )
 
@@ -82,26 +82,26 @@ func TestImageCaption(t *testing.T) {
 }
 
 func TestImageGenerationErrorMessage(t *testing.T) {
-	sexual := &imagegen.ContentBlockedError{
+	sexual := &agent.ContentBlockedError{
 		Reason:   "flagged for sexual or adult content",
-		Category: imagegen.BlockedSexual,
+		Category: agent.BlockedSexual,
 	}
 	require.Equal(t, "Blocked by the image provider: flagged for sexual or adult content", imageGenerationErrorMessage(sexual))
 
-	other := &imagegen.ContentBlockedError{
+	other := &agent.ContentBlockedError{
 		Reason:   "violated the content policy",
-		Category: imagegen.BlockedOther,
+		Category: agent.BlockedOther,
 	}
 	require.Equal(t, "Blocked by the image provider: violated the content policy", imageGenerationErrorMessage(other))
 
-	provider := &imagegen.ProviderError{Reason: "submit returned 422", StatusCode: 422}
+	provider := &agent.ProviderError{Reason: "submit returned 422", StatusCode: 422}
 	require.Equal(t, "The image provider rejected the request: submit returned 422", imageGenerationErrorMessage(provider))
 
 	require.Equal(t, "Image generation failed. Try again in a bit.", imageGenerationErrorMessage(errors.New("boom")))
 }
 
 func TestImageGenerationRateLimitMessage(t *testing.T) {
-	rateErr := &imagegen.RateLimitError{
+	rateErr := &agent.RateLimitError{
 		Reason:     "You have too many active tasks.",
 		StatusCode: http.StatusTooManyRequests,
 		RetryAfter: 45 * time.Second,
@@ -114,7 +114,7 @@ func TestImageGenerationRateLimitMessage(t *testing.T) {
 }
 
 func TestImageGenerationRateLimitMessageWithoutHint(t *testing.T) {
-	rateErr := &imagegen.RateLimitError{
+	rateErr := &agent.RateLimitError{
 		Reason:     "You have too many active tasks.",
 		StatusCode: http.StatusTooManyRequests,
 	}

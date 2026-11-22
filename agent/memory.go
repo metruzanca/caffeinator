@@ -1,5 +1,4 @@
-// Package memory stores and retrieves simple markdown memory.
-package memory
+package agent
 
 import (
 	"errors"
@@ -362,35 +361,4 @@ func cleanCategory(category string) string {
 
 func normalize(text string) string {
 	return strings.Join(strings.Fields(strings.ToLower(text)), " ")
-}
-
-func isDigits(text string) bool {
-	if text == "" {
-		return false
-	}
-	for _, r := range text {
-		if r < '0' || r > '9' {
-			return false
-		}
-	}
-	return true
-}
-
-func tailRunes(text string, max int) string {
-	runes := []rune(strings.TrimSpace(text))
-	if max <= 0 || len(runes) <= max {
-		return string(runes)
-	}
-	return string(runes[len(runes)-max:])
-}
-
-func truncateRunes(text string, max int) string {
-	runes := []rune(text)
-	if max <= 0 || len(runes) <= max {
-		return text
-	}
-	if max <= 3 {
-		return string(runes[:max])
-	}
-	return string(runes[:max-3]) + "..."
 }

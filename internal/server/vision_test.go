@@ -9,7 +9,7 @@ import (
 
 func visionChat(t *testing.T, maxImages, maxMB int) *Chat {
 	t.Helper()
-	return newChat(&fakeChatSession{}, &fakeChatClient{}, ChatConfig{
+	return newChat(&fakeChatSession{}, &fakeAgent{}, ChatConfig{
 		VisionEnabled:    true,
 		VisionMaxImages:  maxImages,
 		VisionMaxImageMB: maxMB,
@@ -17,7 +17,7 @@ func visionChat(t *testing.T, maxImages, maxMB int) *Chat {
 	})
 }
 
-func TestVisionPartsIncludesCurrentAndReferencedImages(t *testing.T) {
+func TestVisionImagesIncludesCurrentAndReferencedImages(t *testing.T) {
 	chat := visionChat(t, 4, 8)
 	current := testMessage("1", "channel", "guild", "111", "what is this?")
 	current.Attachments = []*discordgo.MessageAttachment{
@@ -40,19 +40,17 @@ func TestVisionPartsIncludesCurrentAndReferencedImages(t *testing.T) {
 		},
 	}
 
-	parts := chat.visionParts(current, referenced)
+	images := chat.visionImages(current, referenced)
 
-	require.Len(t, parts, 4)
-	require.Equal(t, "text", parts[0].Type)
-	require.Contains(t, parts[0].Text, "current.png")
-	require.Equal(t, "image_url", parts[1].Type)
-	require.Equal(t, "https://cdn.discordapp.com/attachments/1/2/current.png", parts[1].ImageURL.URL)
-	require.Equal(t, "auto", parts[1].ImageURL.Detail)
-	require.Contains(t, parts[2].Text, "referenced.jpg")
-	require.Equal(t, "https://media.discordapp.net/attachments/3/4/referenced.jpg", parts[3].ImageURL.URL)
+	require.Len(t, images, 2)
+	require.Contains(t, images[0].Label, "current.png")
+	require.Equal(t, "https://cdn.discordapp.com/attachments/1/2/current.png", images[0].URL)
+	require.Equal(t, "auto", images[0].Detail)
+	require.Contains(t, images[1].Label, "referenced.jpg")
+	require.Equal(t, "https://media.discordapp.net/attachments/3/4/referenced.jpg", images[1].URL)
 }
 
-func TestVisionPartsFiltersUnsupportedAndOversizedImages(t *testing.T) {
+func TestVisionImagesFiltersUnsupportedAndOversizedImages(t *testing.T) {
 	chat := visionChat(t, 2, 1)
 	current := testMessage("1", "channel", "guild", "111", "look")
 	current.Attachments = []*discordgo.MessageAttachment{
@@ -82,14 +80,14 @@ func TestVisionPartsFiltersUnsupportedAndOversizedImages(t *testing.T) {
 		},
 	}
 
-	parts := chat.visionParts(current, nil)
+	images := chat.visionImages(current, nil)
 
-	require.Len(t, parts, 2)
-	require.Contains(t, parts[0].Text, "ok.webp")
-	require.Equal(t, "https://cdn.discordapp.com/attachments/1/2/ok.webp", parts[1].ImageURL.URL)
+	require.Len(t, images, 1)
+	require.Contains(t, images[0].Label, "ok.webp")
+	require.Equal(t, "https://cdn.discordapp.com/attachments/1/2/ok.webp", images[0].URL)
 }
 
-func TestVisionPartsRespectsMaxImages(t *testing.T) {
+func TestVisionImagesRespectsMaxImages(t *testing.T) {
 	chat := visionChat(t, 1, 8)
 	current := testMessage("1", "channel", "guild", "111", "look")
 	current.Attachments = []*discordgo.MessageAttachment{
@@ -107,15 +105,15 @@ func TestVisionPartsRespectsMaxImages(t *testing.T) {
 		},
 	}
 
-	parts := chat.visionParts(current, nil)
+	images := chat.visionImages(current, nil)
 
-	require.Len(t, parts, 2)
-	require.Contains(t, parts[0].Text, "one.png")
-	require.NotContains(t, parts[0].Text, "two.png")
+	require.Len(t, images, 1)
+	require.Contains(t, images[0].Label, "one.png")
+	require.NotContains(t, images[0].Label, "two.png")
 }
 
-func TestVisionPartsDisabled(t *testing.T) {
-	chat := newChat(&fakeChatSession{}, &fakeChatClient{}, ChatConfig{})
+func TestVisionImagesDisabled(t *testing.T) {
+	chat := newChat(&fakeChatSession{}, &fakeAgent{}, ChatConfig{})
 	current := testMessage("1", "channel", "guild", "111", "look")
 	current.Attachments = []*discordgo.MessageAttachment{{
 		Filename:    "image.png",
@@ -124,5 +122,5 @@ func TestVisionPartsDisabled(t *testing.T) {
 		URL:         "https://cdn.discordapp.com/attachments/1/2/image.png",
 	}}
 
-	require.Empty(t, chat.visionParts(current, nil))
+	require.Empty(t, chat.visionImages(current, nil))
 }

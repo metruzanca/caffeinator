@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/metruzanca/caffeinator/internal/llm"
+	"github.com/metruzanca/caffeinator/agent"
 )
 
 // ParserSystemPrompt is the system prompt for reminder intent parsing.
@@ -18,7 +18,7 @@ Use the provided current time and user timezone. Only create when a future time 
 
 // ChatClient is the small LLM surface needed by the parser.
 type ChatClient interface {
-	Chat(ctx context.Context, messages []llm.Message) (string, llm.Usage, error)
+	Chat(ctx context.Context, messages []agent.Message) (string, agent.Usage, error)
 }
 
 // ParseResult is the structured reminder intent.
@@ -54,7 +54,7 @@ func (p *Parser) Parse(ctx context.Context, message, timezone string, now time.T
 		timezone = "unknown"
 	}
 
-	content, _, err := p.client.Chat(ctx, []llm.Message{{
+	content, _, err := p.client.Chat(ctx, []agent.Message{{
 		Role: "user",
 		Content: fmt.Sprintf(
 			"Current time: %s\nUser timezone: %s\nMessage: %s",

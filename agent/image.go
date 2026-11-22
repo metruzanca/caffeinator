@@ -1,5 +1,4 @@
-// Package imagegen provides a minimal OpenRouter image generation client.
-package imagegen
+package agent
 
 import (
 	"bytes"
@@ -14,14 +13,12 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/metruzanca/caffeinator/internal/config"
 )
 
 const (
-	defaultBaseURL = "https://openrouter.ai/api/v1"
-	defaultModel   = "black-forest-labs/flux-3-image-klein"
-	maxBodyBytes   = 64 << 20
+	imageDefaultBaseURL = "https://openrouter.ai/api/v1"
+	defaultModel        = "black-forest-labs/flux-3-image-klein"
+	imageMaxBodyBytes   = 64 << 20
 )
 
 // ErrContentBlocked indicates the image provider rejected the prompt or output.
@@ -82,8 +79,8 @@ func (e *RateLimitError) Error() string {
 	return fmt.Sprintf("openrouter image: %s (status %d)", e.Reason, e.StatusCode)
 }
 
-// Request describes one image generation request.
-type Request struct {
+// ImageRequest describes one image generation request.
+type ImageRequest struct {
 	Prompt           string
 	Model            string
 	Resolution       string
@@ -93,21 +90,23 @@ type Request struct {
 	SafetyTolerance  *int
 }
 
-// Output is a generated image.
-type Output struct {
+// ImageOutput is a generated image.
+type ImageOutput struct {
 	Data      []byte
 	MediaType string
 }
 
-// Result is a completed image generation response.
-type Result struct {
-	Images  []Output
+// ImageResult is a completed image generation response.
+type ImageResult struct {
+	Images  []ImageOutput
 	CostUSD float64
 }
 
-// Client calls OpenRouter's image generation endpoint.
-type Client struct {
+// ImageClient calls OpenRouter's image generation endpoint.
+type ImageClient struct {
 	APIKey     string
+	AppName    string
+	AppURL     string
 	Model      string
 	BaseURL    string
 	HTTPClient *http.Client
@@ -150,12 +149,12 @@ type imageResponse struct {
 }
 
 // Generate creates one or more images.
-func (c *Client) Generate(ctx context.Context, req Request) (Result, error) {
+func (c *ImageClient) Generate(ctx context.Context, req ImageRequest) (ImageResult, error) {
 	if c == nil || strings.TrimSpace(c.APIKey) == "" {
-		return Result{}, errors.New("openrouter API key is empty")
+		return ImageResult{}, errors.New("openrouter API key is empty")
 	}
 	if strings.TrimSpace(req.Prompt) == "" {
-		return Result{}, errors.New("image prompt is empty")
+		return ImageResult{}, errors.New("image prompt is empty")
 	}
 
 	model := strings.TrimSpace(req.Model)
@@ -198,32 +197,32 @@ func (c *Client) Generate(ctx context.Context, req Request) (Result, error) {
 
 	payload, err := json.Marshal(body)
 	if err != nil {
-		return Result{}, fmt.Errorf("cannot encode image request: %w", err)
+		return ImageResult{}, fmt.Errorf("cannot encode image request: %w", err)
 	}
 
 	baseURL := strings.TrimRight(strings.TrimSpace(c.BaseURL), "/")
 	if baseURL == "" {
-		baseURL = defaultBaseURL
+		baseURL = imageDefaultBaseURL
 	}
 
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, baseURL+"/images", bytes.NewReader(payload))
 	if err != nil {
-		return Result{}, fmt.Errorf("cannot create image request: %w", err)
+		return ImageResult{}, fmt.Errorf("cannot create image request: %w", err)
 	}
 	httpReq.Header.Set("Authorization", "Bearer "+c.APIKey)
 	httpReq.Header.Set("Content-Type", "application/json")
-	httpReq.Header.Set("HTTP-Referer", config.AppURL())
-	httpReq.Header.Set("X-Title", config.BotName())
+	httpReq.Header.Set("HTTP-Referer", c.AppURL)
+	httpReq.Header.Set("X-Title", c.AppName)
 
 	resp, err := c.httpClient().Do(httpReq)
 	if err != nil {
-		return Result{}, fmt.Errorf("openrouter image request failed: %w", err)
+		return ImageResult{}, fmt.Errorf("openrouter image request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
-	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBodyBytes))
+	data, err := io.ReadAll(io.LimitReader(resp.Body, imageMaxBodyBytes))
 	if err != nil {
-		return Result{}, fmt.Errorf("cannot read image response: %w", err)
+		return ImageResult{}, fmt.Errorf("cannot read image response: %w", err)
 	}
 
 	if resp.StatusCode >= http.StatusBadRequest {
@@ -233,11 +232,11 @@ func (c *Client) Generate(ctx context.Context, req Request) (Result, error) {
 			message = strings.TrimSpace(apiErr.Error.Message)
 		}
 		if message == "" {
-			message = truncate(string(data), 300)
+			message = truncateImageBody(string(data), 300)
 		}
 
 		if resp.StatusCode == http.StatusBadRequest && isModerationMessage(message) {
-			return Result{}, &ContentBlockedError{
+			return ImageResult{}, &ContentBlockedError{
 				Reason:     message,
 				Category:   classifyBlocked(message),
 				StatusCode: resp.StatusCode,
@@ -245,14 +244,14 @@ func (c *Client) Generate(ctx context.Context, req Request) (Result, error) {
 		}
 
 		if resp.StatusCode == http.StatusTooManyRequests || isRateLimitMessage(message) {
-			return Result{}, &RateLimitError{
+			return ImageResult{}, &RateLimitError{
 				Reason:     message,
 				StatusCode: resp.StatusCode,
 				RetryAfter: parseRetryAfter(resp.Header, message),
 			}
 		}
 
-		return Result{}, &ProviderError{
+		return ImageResult{}, &ProviderError{
 			Reason:     message,
 			StatusCode: resp.StatusCode,
 		}
@@ -260,20 +259,20 @@ func (c *Client) Generate(ctx context.Context, req Request) (Result, error) {
 
 	var parsed imageResponse
 	if err := json.Unmarshal(data, &parsed); err != nil {
-		return Result{}, fmt.Errorf("cannot decode image response: %w", err)
+		return ImageResult{}, fmt.Errorf("cannot decode image response: %w", err)
 	}
 	if parsed.Error != nil {
-		return Result{}, fmt.Errorf("openrouter image: %s", parsed.Error.Message)
+		return ImageResult{}, fmt.Errorf("openrouter image: %s", parsed.Error.Message)
 	}
 	if len(parsed.Data) == 0 {
-		return Result{}, errors.New("openrouter returned no images")
+		return ImageResult{}, errors.New("openrouter returned no images")
 	}
 
-	result := Result{CostUSD: parsed.Usage.Cost}
+	result := ImageResult{CostUSD: parsed.Usage.Cost}
 	for _, item := range parsed.Data {
 		if strings.TrimSpace(item.B64JSON) == "" {
 			if strings.TrimSpace(item.URL) != "" {
-				return Result{}, errors.New("openrouter returned a URL instead of image bytes")
+				return ImageResult{}, errors.New("openrouter returned a URL instead of image bytes")
 			}
 			continue
 		}
@@ -285,25 +284,25 @@ func (c *Client) Generate(ctx context.Context, req Request) (Result, error) {
 		}
 		decoded, err := base64.StdEncoding.DecodeString(encoded)
 		if err != nil {
-			return Result{}, fmt.Errorf("cannot decode image bytes: %w", err)
+			return ImageResult{}, fmt.Errorf("cannot decode image bytes: %w", err)
 		}
 		mediaType := strings.TrimSpace(item.MediaType)
 		if mediaType == "" {
 			mediaType = "image/png"
 		}
-		result.Images = append(result.Images, Output{
+		result.Images = append(result.Images, ImageOutput{
 			Data:      decoded,
 			MediaType: mediaType,
 		})
 	}
 
 	if len(result.Images) == 0 {
-		return Result{}, errors.New("openrouter returned no decodable images")
+		return ImageResult{}, errors.New("openrouter returned no decodable images")
 	}
 	return result, nil
 }
 
-func (c *Client) httpClient() *http.Client {
+func (c *ImageClient) httpClient() *http.Client {
 	if c.HTTPClient != nil {
 		return c.HTTPClient
 	}
@@ -413,7 +412,7 @@ func classifyBlocked(message string) BlockedCategory {
 	return BlockedOther
 }
 
-func truncate(s string, max int) string {
+func truncateImageBody(s string, max int) string {
 	s = strings.TrimSpace(s)
 	if max <= 0 || len(s) <= max {
 		return s
