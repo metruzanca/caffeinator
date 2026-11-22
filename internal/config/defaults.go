@@ -67,7 +67,7 @@ func SetDefaults() {
 	viper.SetDefault("MEMES_MAX_IMAGE_MB", 8)
 	viper.SetDefault("MEMES_ANALYSIS_MODEL", "")
 	viper.SetDefault("MEMES_ANALYSIS_TIMEOUT_SECONDS", 60)
-	viper.SetDefault("MEMES_REFRESH_TIMEOUT_SECONDS", 300)
+	viper.SetDefault("MEMES_REFRESH_TIMEOUT_SECONDS", 600)
 	viper.SetDefault("MEMES_PATH", "")
 	viper.SetDefault("MEMES_DIR", "")
 	viper.SetDefault("MEMES_INCLUDE_NSFW", false)

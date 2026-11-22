@@ -93,7 +93,7 @@ func refreshMemes(h *CommandHandler, s *discordgo.Session, i *discordgo.Interact
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 	defer cancel()
 
 	text, err := h.Memes.Refresh(ctx)

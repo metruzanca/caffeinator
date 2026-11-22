@@ -12,7 +12,7 @@
 - **MUST**: Keep the bot small. Prefer removing features over adding them.
 - **MUST**: Never log message contents or API keys.
 - **MUST**: Learn only from conversations where the bot is invoked. Never read normal channel traffic.
-- **MUST NOT**: Add a database layer without an explicit product decision. Persistent state is markdown memory on disk.
+- **MUST NOT**: Add a database layer without an explicit product decision. Persistent state is markdown memory, JSON records, and meme images on disk.
 - **MUST NOT**: Add dashboards, plugin systems, or config UIs.
 
 **Key files**
@@ -23,6 +23,7 @@
 - Discord chat adapter: `internal/server/chat.go`
 - Agent prompt pipeline: `agent/agent.go`
 - Memory store and extraction: `agent/memory.go` and `agent/extractor.go`
+- Meme memory: `agent/memestore.go` and `internal/memes/`
 - Reminder store, parser, scheduler: `internal/reminders/`
 - Reminder Discord integration: `internal/server/reminders.go`
 - OpenRouter chat client: `agent/openrouter.go`
@@ -43,7 +44,7 @@ go test ./...
 
 ## Architecture
 
-The bot has no database, ORM, migration tool, or `go generate` step. Persistent state is markdown memory on disk.
+The bot has no database, ORM, migration tool, or `go generate` step. Persistent state is markdown memory, JSON records, and meme images on disk.
 
 The `agent/` package is the AI engine. It handles OpenRouter chat and image calls, prompt assembly, memory, and extraction. It must not import `discordgo`, `internal/*`, Viper, or the project logger. `internal/server/` is the Discord adapter: it fetches Discord messages, maps them to `agent.Turn`, sends replies, and logs. `internal/reminders/` is an app feature that uses `agent.ChatClient` for parsing and writing.
 
@@ -54,6 +55,7 @@ Features:
 3. `/memory` lets users inspect and remove their own memory. Admins can target other users or server memory.
 4. `/imagine` generates images through OpenRouter, with an optional reference image.
 5. Reminders and events are created from natural language, stored as JSON, and fired by a scheduler.
+6. Meme memory scrapes top subreddit posts, understands the images, and shares relevant memes in chat.
 
 `main.go` starts the bot and handles shutdown. `internal/server.NewBot` creates the Discord session and sets the required intents. `Bot.Start` connects, registers the chat handler, installs slash commands, and handles newly joined servers.
 
@@ -203,6 +205,29 @@ Location: `internal/server/vision.go` for Discord attachment checks, `agent/agen
 - Do not use images for passive memory extraction.
 
 The OpenRouter message format uses a content array with a text part first and `image_url` parts after it. Text-only messages must stay JSON strings.
+
+---
+
+## Meme memory
+
+Location: `agent/memestore.go` and `internal/memes/`
+
+- Scrapes old.reddit top listings on a cron expression.
+- Requires `REDDIT_SESSION`. Anonymous Reddit requests return 403 or a login page.
+- Keeps a 2 second gap between Reddit requests.
+- Stores only image posts. Galleries use the cover image. Text, link, and video posts are skipped.
+- Downloads images only from Reddit and Imgur image hosts. Enforces `MEMES_MAX_IMAGE_MB`.
+- Sends each image to the vision model and stores a JSON caption, context, tags, and `use_when` phrases.
+- Meme memory lives in `MEMES_PATH` as JSON. Images live in `MEMES_DIR`.
+- Retrieval scores tags, `use_when`, caption words, recency, and reaction count against the prompt and last two messages.
+- The agent injects the top matches and tells the model to use at most one. A `[meme:<id>]` marker is stripped and replaced by the image attachment.
+- `/ask disable_memory:true` disables meme retrieval for that request. `MEMES_ENABLED=false` turns the feature off.
+- Reactions on the bot's own meme replies are watched. The positive allowlist is `MEMES_POSITIVE_REACTIONS`, default `😂 🤣 💀 🔥 👍 ❤️ 😆`.
+- Each human reactor counts once. Bot reactions are ignored.
+- Reacted or used memes survive age pruning and are evicted last when the cap is reached.
+- Unused and unreacted memes older than `MEMES_RETENTION_DAYS` are deleted. Image files and orphans are cleaned up.
+- Memes are never posted on a schedule. They only appear when the bot chooses one in a reply.
+- `/memes status`, `/memes refresh`, and `/memes list` are admin only.
 
 ---
 

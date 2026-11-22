@@ -87,6 +87,11 @@ func NewRunner(cfg RunnerConfig) *Runner {
 		subreddits = append(subreddits, name)
 	}
 
+	dir := strings.TrimSpace(cfg.Dir)
+	if dir == "" {
+		dir = filepath.Join("memory", "memes")
+	}
+
 	period := normalizePeriod(cfg.Period)
 	scanLimit := cfg.ScanLimit
 	if scanLimit <= 0 {
@@ -113,7 +118,7 @@ func NewRunner(cfg RunnerConfig) *Runner {
 		images:        cfg.Images,
 		analyzer:      cfg.Analyzer,
 		store:         cfg.Store,
-		dir:           cfg.Dir,
+		dir:           dir,
 		subreddits:    subreddits,
 		period:        period,
 		scanLimit:     scanLimit,

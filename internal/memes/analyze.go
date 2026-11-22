@@ -55,7 +55,8 @@ func (a *Analyzer) Analyze(ctx context.Context, post Post, image Image) (Analysi
 	if a == nil || a.client == nil {
 		return Analysis{}, errors.New("meme analyzer is disabled")
 	}
-	if strings.TrimSpace(image.DataURL()) == "" {
+	dataURL := image.DataURL()
+	if strings.TrimSpace(dataURL) == "" {
 		return Analysis{}, errors.New("meme image is empty")
 	}
 
@@ -65,7 +66,7 @@ func (a *Analyzer) Analyze(ctx context.Context, post Post, image Image) (Analysi
 		Content: prompt,
 		Parts: []agent.ContentPart{
 			{Type: "text", Text: "Meme image"},
-			{Type: "image_url", ImageURL: &agent.ImageURL{URL: image.DataURL(), Detail: "auto"}},
+			{Type: "image_url", ImageURL: &agent.ImageURL{URL: dataURL, Detail: "auto"}},
 		},
 	}}
 

@@ -17,7 +17,7 @@ The Discord username, avatar, and description are set in the [Discord Developer 
 `CHAT_SYSTEM_PROMPT` replaces the built-in prompt entirely. The default prompt:
 
 - Tells the bot it is `BOT_NAME`, a Discord bot for `COMMUNITY_NAME`.
-- Describes its chat, search, vision, image, reminder, and memory features.
+- Describes its chat, search, vision, image, reminder, memory, and meme features.
 - Makes replies peer-like, casual, and direct.
 - Bans em dashes and asks for short, simple sentences.
 - Limits replies to 280 characters unless the user asks for more.
@@ -30,11 +30,14 @@ The Discord username, avatar, and description are set in the [Discord Developer 
 
 ## Feature toggles
 
-`CHAT_ENABLED`, `VISION_ENABLED`, `IMAGE_ENABLED`, `REMINDERS_ENABLED`, and `MEMORY_ENABLED` all default to `true`.
+`CHAT_ENABLED`, `VISION_ENABLED`, `IMAGE_ENABLED`, `REMINDERS_ENABLED`, `MEMORY_ENABLED`, and `MEMES_ENABLED` all default to `true`.
 
 `MEMORY_PASSIVE_ENABLED` controls automatic learning from normal messages.
 
 `OPENROUTER_WEB_SEARCH` controls web search.
+
+Meme memory needs `REDDIT_SESSION`. Without it the bot logs a warning and the
+scheduled scrape is skipped. See [meme memory](memes.md).
 
 ## Environment reference
 
@@ -92,6 +95,26 @@ The Discord username, avatar, and description are set in the [Discord Developer 
 | `VISION_MAX_IMAGES` | `4` | Maximum images per chat request |
 | `VISION_MAX_IMAGE_MB` | `8` | Maximum image size in MB |
 | `VISION_DETAIL` | `auto` | Image detail: `auto`, `low`, `high`, or `original` |
+| `MEMES_ENABLED` | `true` | Enable meme memory |
+| `MEMES_CRON` | `0 15 * * 1,3,5` | Meme scrape cron in `MEMES_TIMEZONE` |
+| `MEMES_TIMEZONE` | `UTC` | Timezone for the meme cron |
+| `MEMES_SUBREDDITS` | `ProgrammerHumor` | Comma-separated subreddits |
+| `MEMES_TOP_PERIOD` | `week` | Top listing period |
+| `MEMES_SCAN_LIMIT` | `25` | Posts read per subreddit |
+| `MEMES_POSTS_PER_RUN` | `5` | New memes analyzed per run |
+| `MEMES_MAX_STORED` | `50` | Maximum stored memes |
+| `MEMES_RETENTION_DAYS` | `30` | Age limit for unused, unreacted memes |
+| `MEMES_RELEVANCE_LIMIT` | `3` | Memes injected into a chat request |
+| `MEMES_MAX_IMAGE_MB` | `8` | Maximum meme image size |
+| `MEMES_ANALYSIS_MODEL` | empty | Vision model. Defaults to `OPENROUTER_MODEL` |
+| `MEMES_ANALYSIS_TIMEOUT_SECONDS` | `60` | Vision call timeout per meme |
+| `MEMES_REFRESH_TIMEOUT_SECONDS` | `600` | Whole scrape timeout |
+| `MEMES_PATH` | `MEMORY_DIR/memes.json` | Meme memory file |
+| `MEMES_DIR` | `MEMORY_DIR/memes` | Meme image directory |
+| `MEMES_INCLUDE_NSFW` | `false` | Allow NSFW top posts |
+| `MEMES_POSITIVE_REACTIONS` | see [meme memory](memes.md) | Reactions that mark a meme as good |
+| `REDDIT_SESSION` | empty | Reddit session cookie. Required for meme memory |
+| `REDDIT_USER_AGENT` | Firefox UA | Browser identity sent to Reddit |
 
 `TOKEN` and `OPENROUTER_API_KEY` are required. The bot exits at startup when either is missing.
 
@@ -100,6 +123,7 @@ The Discord username, avatar, and description are set in the [Discord Developer 
 - Use the repository root as the build directory.
 - Mount a volume at `/data`.
 - Set `MEMORY_DIR=/data/memory` and `REMINDERS_PATH=/data/reminders.json`.
+- Meme memory defaults to `/data/memory/memes.json` and `/data/memory/memes` when `MEMORY_DIR` is set. Set `REDDIT_SESSION` to enable scraping.
 - Railway provides `RAILWAY_GIT_COMMIT_SHA` and `RAILWAY_GIT_COMMIT_MESSAGE`, which the restart notice uses.
 
 ## Restart notice

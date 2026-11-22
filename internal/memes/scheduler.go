@@ -119,7 +119,12 @@ func (s *Scheduler) Stop() {
 	s.started = false
 	stopped := s.cron.Stop()
 	s.mu.Unlock()
-	<-stopped.Done()
+
+	select {
+	case <-stopped.Done():
+	case <-time.After(5 * time.Second):
+		log.Warn("meme scheduler did not stop in time")
+	}
 }
 
 func (s *Scheduler) run() {
@@ -134,7 +139,11 @@ func (s *Scheduler) run() {
 		log.Error("scheduled meme refresh failed", "err", err)
 		return
 	}
-	log.Info("scheduled meme refresh finished", "added", result.Added, "pruned", result.Pruned)
+	log.Info("scheduled meme refresh finished",
+		"added", result.Added,
+		"failed", result.Failed,
+		"pruned", result.Pruned,
+	)
 }
 
 type cronLog struct{}

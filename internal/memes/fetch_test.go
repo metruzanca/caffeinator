@@ -51,6 +51,20 @@ func TestImageFetcherRejectsOversizedImage(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestImageFetcherRejectsHTMLBlock(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		_, _ = w.Write([]byte("<html><body>blocked</body></html>"))
+	}))
+	defer server.Close()
+
+	fetcher := NewImageFetcher("test-agent", 1)
+	fetcher.allowURL = func(string) bool { return true }
+
+	_, err := fetcher.Fetch(context.Background(), server.URL+"/meme.png")
+	require.Error(t, err)
+}
+
 func TestImageFetcherRejectsUnknownHost(t *testing.T) {
 	fetcher := NewImageFetcher("test-agent", 1)
 	_, err := fetcher.Fetch(context.Background(), "https://example.com/meme.png")

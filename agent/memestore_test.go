@@ -82,7 +82,13 @@ func TestMemeStoreRelevant(t *testing.T) {
 	database.Tags = []string{"sql", "database"}
 	database.UseWhen = []string{"someone mentions database queries"}
 
-	_, err := store.AddAll([]Meme{build, database})
+	cpp := testMeme("cpp", now)
+	cpp.Title = "C++ templates"
+	cpp.Caption = "A developer stares at a template error."
+	cpp.Tags = []string{"c++", "templates"}
+	cpp.UseWhen = []string{"someone complains about C++ templates"}
+
+	_, err := store.AddAll([]Meme{build, database, cpp})
 	require.NoError(t, err)
 
 	results := store.Relevant("my CI build keeps failing in the pipeline", 3)
@@ -92,6 +98,10 @@ func TestMemeStoreRelevant(t *testing.T) {
 	results = store.Relevant("how do I write a SQL join", 3)
 	require.NotEmpty(t, results)
 	require.Equal(t, "db", results[0].ID)
+
+	results = store.Relevant("why are c++ templates so hard", 3)
+	require.NotEmpty(t, results)
+	require.Equal(t, "cpp", results[0].ID)
 
 	require.Empty(t, store.Relevant("the weather is nice today", 3))
 }
@@ -128,6 +138,10 @@ func TestMemeStoreExtractMemeMarkers(t *testing.T) {
 
 	text, used = ExtractMemeMarkers("[meme:unknown] still here", selected)
 	require.Equal(t, "still here", text)
+	require.Empty(t, used)
+
+	text, used = ExtractMemeMarkers("[meme:<id>] placeholder", selected)
+	require.Equal(t, "placeholder", text)
 	require.Empty(t, used)
 
 	text, used = ExtractMemeMarkers("[meme:abc123] [meme:def456]", selected)
@@ -178,9 +192,11 @@ func TestMemeStorePruneRetiresUnreactedOldMemes(t *testing.T) {
 	oldReaction := testMeme("old-liked", now.Add(-40*24*time.Hour))
 	oldReaction.ReactorIDs = []string{"1"}
 	oldReaction.Reactions = 1
+	oldUsed := testMeme("old-used", now.Add(-40*24*time.Hour))
+	oldUsed.Uses = 1
 	fresh := testMeme("fresh", now.Add(-2*24*time.Hour))
 
-	_, err := store.AddAll([]Meme{old, oldReaction, fresh})
+	_, err := store.AddAll([]Meme{old, oldReaction, oldUsed, fresh})
 	require.NoError(t, err)
 
 	removed, err := store.Prune(30, 50)
@@ -189,8 +205,9 @@ func TestMemeStorePruneRetiresUnreactedOldMemes(t *testing.T) {
 	require.Equal(t, "old", removed[0].ID)
 
 	memes := store.List()
-	require.Len(t, memes, 2)
+	require.Len(t, memes, 3)
 	require.True(t, store.Contains("old-liked"))
+	require.True(t, store.Contains("old-used"))
 	require.True(t, store.Contains("fresh"))
 }
 

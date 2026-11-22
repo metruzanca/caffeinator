@@ -22,7 +22,7 @@ const (
 	memeContextLineChars   = 240
 )
 
-var memeMarkerPattern = regexp.MustCompile(`\[meme:([A-Za-z0-9]+)\]`)
+var memeMarkerPattern = regexp.MustCompile(`\[meme:([^\]\s]+)\]`)
 
 // MemeShare records one Discord message that carried a meme image.
 type MemeShare struct {
@@ -357,7 +357,8 @@ func (s *MemeStore) Prune(retentionDays, maxStored int) ([]Meme, error) {
 	kept := make([]Meme, 0, len(s.doc.Memes))
 	var removed []Meme
 	for _, meme := range s.doc.Memes {
-		if retentionDays > 0 && meme.Reactions == 0 && !meme.AddedAt.IsZero() && meme.AddedAt.Before(cutoff) {
+		if retentionDays > 0 && meme.Reactions == 0 && meme.Uses == 0 &&
+			!meme.AddedAt.IsZero() && meme.AddedAt.Before(cutoff) {
 			removed = append(removed, meme)
 			continue
 		}
@@ -631,7 +632,7 @@ func uniqueMemeTokens(text string) []string {
 	seen := make(map[string]bool)
 	var tokens []string
 	for _, token := range strings.FieldsFunc(strings.ToLower(text), func(r rune) bool {
-		return !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9')
+		return !(r >= 'a' && r <= 'z') && !(r >= '0' && r <= '9') && r != '+' && r != '#'
 	}) {
 		if len(token) < 2 || seen[token] || memeStopwords[token] {
 			continue

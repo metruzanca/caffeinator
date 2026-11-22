@@ -51,9 +51,20 @@ func NewImageFetcher(userAgent string, maxMB int) *ImageFetcher {
 		maxBytes = defaultImageMaxBytes
 	}
 	return &ImageFetcher{
-		httpClient: &http.Client{Timeout: 30 * time.Second},
-		userAgent:  userAgent,
-		maxBytes:   maxBytes,
+		httpClient: &http.Client{
+			Timeout: 30 * time.Second,
+			CheckRedirect: func(req *http.Request, via []*http.Request) error {
+				if len(via) >= 5 {
+					return errors.New("too many image redirects")
+				}
+				if !isMemeImageURL(req.URL.String()) {
+					return errors.New("image redirect host is not allowed")
+				}
+				return nil
+			},
+		},
+		userAgent: userAgent,
+		maxBytes:  maxBytes,
 	}
 }
 
@@ -103,7 +114,7 @@ func (f *ImageFetcher) Fetch(ctx context.Context, rawURL string) (Image, error) 
 	}
 
 	mediaType := http.DetectContentType(data)
-	if _, ok := allowedImageTypes[mediaType]; !ok {
+	if _, ok := allowedImageTypes[mediaType]; !ok && mediaType == "application/octet-stream" {
 		headerType := strings.ToLower(strings.TrimSpace(strings.Split(resp.Header.Get("Content-Type"), ";")[0]))
 		if _, ok := allowedImageTypes[headerType]; ok {
 			mediaType = headerType

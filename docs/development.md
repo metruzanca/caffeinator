@@ -9,11 +9,13 @@
 │   ├── openrouter.go          # OpenRouter chat client
 │   ├── image.go               # OpenRouter image client
 │   ├── memory.go              # Markdown memory store
+│   ├── memestore.go           # Meme memory, relevance, reactions, retirement
 │   ├── extractor.go           # Fact extraction
 │   └── message.go             # User, turn, attachment, and image types
 ├── docs/                      # Feature and configuration docs
 ├── internal/
 │   ├── config/                # Viper, dotenv, branding, logging
+│   ├── memes/                 # Reddit scraper, image analysis, runner, cron
 │   ├── ratelimit/             # Shared token bucket limiter
 │   ├── reminders/             # Reminder store, parser, recurrence, scheduler
 │   ├── server/                # Discord adapter and bot lifecycle
@@ -34,7 +36,7 @@ go test ./...
 go vet ./...
 ```
 
-The suite covers agent prompt assembly, mention detection, `/ask`, memory storage and extraction, image generation request and response handling, reminders and recurrence, response chunking, rate limiting, and the OpenRouter clients. Tests use `httptest` and never call live APIs.
+The suite covers agent prompt assembly, mention detection, `/ask`, memory storage and extraction, meme scraping and retrieval, image generation request and response handling, reminders and recurrence, response chunking, rate limiting, and the OpenRouter clients. Tests use `httptest` and never call live APIs.
 
 `agent/` is the AI engine and must stay free of Discord types. `internal/server/` wires it to discordgo.
 

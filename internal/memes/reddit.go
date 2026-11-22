@@ -131,8 +131,18 @@ func (c *RedditClient) Top(ctx context.Context, subreddit, period string, limit 
 	if limit <= 0 {
 		limit = 25
 	}
+	listingLimit := limit
+	if listingLimit > 100 {
+		listingLimit = 100
+	}
 
-	endpoint := fmt.Sprintf("%s/r/%s/top/?t=%s", c.baseURL, url.PathEscape(subreddit), url.QueryEscape(period))
+	endpoint := fmt.Sprintf(
+		"%s/r/%s/top/?t=%s&limit=%d",
+		c.baseURL,
+		url.PathEscape(subreddit),
+		url.QueryEscape(period),
+		listingLimit,
+	)
 	body, err := c.get(ctx, endpoint, "text/html,application/xhtml+xml", redditMaxListingBytes)
 	if err != nil {
 		return nil, err

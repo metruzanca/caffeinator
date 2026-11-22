@@ -18,18 +18,19 @@ import (
 )
 
 type memesRuntime struct {
-	Store       *agent.MemeStore
-	Dir         string
-	Runner      *memes.Runner
-	Scheduler   *memes.Scheduler
-	Positive    map[string]bool
-	Configured  bool
-	Subreddits  []string
-	Expression  string
-	Timezone    string
-	Keep        int
-	Retention   int
-	PostsPerRun int
+	Store         *agent.MemeStore
+	Dir           string
+	Runner        *memes.Runner
+	Scheduler     *memes.Scheduler
+	Positive      map[string]bool
+	Configured    bool
+	Subreddits    []string
+	Expression    string
+	Timezone      string
+	ScheduleError string
+	Keep          int
+	Retention     int
+	PostsPerRun   int
 }
 
 func newMemesFromConfig() *memesRuntime {
@@ -118,6 +119,7 @@ func newMemesFromConfig() *memesRuntime {
 		RetentionDays: viper.GetInt("MEMES_RETENTION_DAYS"),
 	})
 
+	scheduleError := ""
 	scheduler, err := memes.NewScheduler(
 		runner,
 		viper.GetString("MEMES_CRON"),
@@ -126,20 +128,24 @@ func newMemesFromConfig() *memesRuntime {
 	)
 	if err != nil {
 		log.Error("meme schedule disabled", "err", err)
+		scheduleError = err.Error()
 		scheduler = nil
 	}
 
 	runtime := &memesRuntime{
-		Store:       store,
-		Dir:         dir,
-		Runner:      runner,
-		Scheduler:   scheduler,
-		Positive:    parseReactionSet(viper.GetString("MEMES_POSITIVE_REACTIONS")),
-		Configured:  reddit.Configured(),
-		Subreddits:  runner.Subreddits(),
-		Keep:        runner.Keep(),
-		Retention:   runner.RetentionDays(),
-		PostsPerRun: runner.PostsPerRun(),
+		Store:         store,
+		Dir:           dir,
+		Runner:        runner,
+		Scheduler:     scheduler,
+		Positive:      parseReactionSet(viper.GetString("MEMES_POSITIVE_REACTIONS")),
+		Configured:    reddit.Configured(),
+		Subreddits:    runner.Subreddits(),
+		Expression:    strings.TrimSpace(viper.GetString("MEMES_CRON")),
+		Timezone:      strings.TrimSpace(viper.GetString("MEMES_TIMEZONE")),
+		ScheduleError: scheduleError,
+		Keep:          runner.Keep(),
+		Retention:     runner.RetentionDays(),
+		PostsPerRun:   runner.PostsPerRun(),
 	}
 	if scheduler != nil {
 		runtime.Expression = scheduler.Expression()
@@ -274,7 +280,9 @@ func (s memeCommandService) StatusText() string {
 	lines := []string{"Meme memory is enabled."}
 	lines = append(lines, "Subreddits: "+strings.Join(s.runtime.Subreddits, ", "))
 	lines = append(lines, "Top period: "+s.runtime.Runner.Period())
-	if s.runtime.Expression == "" {
+	if s.runtime.ScheduleError != "" {
+		lines = append(lines, "Schedule error: "+truncateRunes(s.runtime.ScheduleError, 300))
+	} else if s.runtime.Expression == "" {
 		lines = append(lines, "Schedule: not configured")
 	} else {
 		lines = append(lines, fmt.Sprintf("Schedule: `%s` (%s)", s.runtime.Expression, s.runtime.Timezone))
@@ -293,7 +301,8 @@ func (s memeCommandService) StatusText() string {
 		lines = append(lines, "Last error: "+truncateRunes(status.LastError, 300))
 	}
 	lines = append(lines, fmt.Sprintf("Stored: %d/%d", status.Stored, s.runtime.Keep))
-	lines = append(lines, fmt.Sprintf("Retention: %d days for unreacted memes", s.runtime.Retention))
+	lines = append(lines, fmt.Sprintf("Per run: up to %d new memes", s.runtime.PostsPerRun))
+	lines = append(lines, fmt.Sprintf("Retention: %d days for unused, unreacted memes", s.runtime.Retention))
 	lines = append(lines, fmt.Sprintf("Reactions: %d", status.Reactions))
 	if s.runtime.Configured {
 		lines = append(lines, "Reddit session: configured")

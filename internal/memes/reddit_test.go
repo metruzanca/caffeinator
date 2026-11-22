@@ -91,7 +91,7 @@ func TestRedditTopFetchesWithSession(t *testing.T) {
 	posts, err := client.Top(context.Background(), "ProgrammerHumor", "week", 5)
 	require.NoError(t, err)
 	require.Len(t, posts, 2)
-	require.Equal(t, "/r/programmerhumor/top/?t=week", gotPath)
+	require.Equal(t, "/r/programmerhumor/top/?t=week&limit=5", gotPath)
 	require.Contains(t, gotCookie, "reddit_session=secret")
 	require.Equal(t, "programmerhumor", posts[0].Subreddit)
 }

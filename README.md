@@ -28,11 +28,12 @@ Caffeinator is a small AI Discord bot written in Go with [discordgo](https://git
 - **Image generation.** `/imagine` generates or edits images through OpenRouter. [Details](docs/image-generation.md)
 - **Reminders and events.** Natural language reminders, joinable events, and recurring schedules. [Details](docs/reminders.md)
 - **Memory.** Learns durable facts and stores them as editable markdown. [Details](docs/memory.md)
+- **Meme memory.** Scrapes top programming memes, understands the images, and shares relevant ones in chat. [Details](docs/memes.md)
 
 ## Small by design
 
 - One Go binary. No database, no web dashboard, no plugin system.
-- State is plain markdown and JSON on disk.
+- State is plain markdown, JSON, and image files on disk.
 - A handful of commands instead of a platform.
 
 ## Commands
@@ -44,6 +45,7 @@ Caffeinator is a small AI Discord bot written in Go with [discordgo](https://git
 | `/timezone zone:<iana>` | Sets your timezone for reminders. |
 | `/reminders list\|cancel\|leave` | Lists and manages reminders and events. |
 | `/memory view\|forget\|list` | Views or forgets memory. Admins can manage server memory. |
+| `/memes status\|refresh\|list` | Inspects or refreshes meme memory. Admin only. |
 
 ---
 
@@ -63,6 +65,8 @@ TOKEN=your-discord-bot-token
 OPENROUTER_API_KEY=your-openrouter-key
 MEMORY_DIR=/data/memory
 REMINDERS_PATH=/data/reminders.json
+# Needed for meme memory. See docs/memes.md.
+REDDIT_SESSION=your-reddit-session-cookie
 ```
 
 7. Deploy. Railway detects Go from `go.mod` at the repository root.
